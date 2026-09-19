@@ -93,6 +93,7 @@ async function suggestReply(req, res) {
     'At most ' + maxWords + ' words, under 280 characters.',
     'Tone: ' + tone + '.',
     'Sound like a person, not a brand. No hashtags.',
+    'Never use em dashes or en dashes. Use a comma or a full stop.',
     single
       ? 'Output the reply text only, with no quotes or preamble.'
       : 'Output a numbered list, one reply per line.'
@@ -138,7 +139,9 @@ async function suggestReply(req, res) {
     // Some reasoning models put the answer under `reasoning` when `content`
     // comes back empty.
     const content = message.content || message.reasoning || '';
-    const suggestions = parseReplySuggestions(content, count);
+    const suggestions = parseReplySuggestions(content, count)
+      .map(stripTells)
+      .filter(Boolean);
 
     if (suggestions.length === 0) {
       return res.status(502).json({
@@ -228,6 +231,26 @@ function parseReplySuggestions(text, count) {
   }
 
   return suggestions.slice(0, 3);
+}
+
+// The prompt asks the model to avoid these, but models slip, so strip them
+// rather than trusting the instruction. Em dashes and curly punctuation are
+// the clearest giveaways that a reply was not typed on a phone keyboard.
+function stripTells(text) {
+  return text
+    // An em or en dash becomes a comma, which is how the same pause is
+    // written by hand in a casual reply.
+    .replace(/\s*[\u2014\u2013]\s*/g, ', ')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/\u2026/g, '...')
+    // Tidy up what the substitutions above can leave behind.
+    .replace(/,{2,}/g, ',')
+    .replace(/,\s*([.!?,])/g, '$1')
+    .replace(/\s+([.!?,])/g, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[\s,]+$/, '')
+    .trim();
 }
 
 function stripQuotes(text) {
