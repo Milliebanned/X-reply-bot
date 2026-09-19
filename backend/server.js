@@ -14,8 +14,8 @@ app.use(cors());
 app.use(express.json());
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
 function health(req, res) {
   res.json({
@@ -29,6 +29,39 @@ function health(req, res) {
 // functions layer and everything else arrives via the catch-all rewrite.
 app.get('/health', health);
 app.get('/api/health', health);
+
+// Lists the models this API key can actually call, so a rejected model id
+// can be replaced with a real one instead of guessed at.
+async function listModels(req, res) {
+  if (!GROQ_API_KEY) {
+    return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server' });
+  }
+
+  try {
+    const response = await axios.get(GROQ_BASE_URL + '/models', {
+      headers: { Authorization: 'Bearer ' + GROQ_API_KEY },
+      timeout: 20000
+    });
+
+    const available = (response.data.data || [])
+      .map(function (model) { return model.id; })
+      .sort();
+
+    res.json({ current: GROQ_MODEL, available: available });
+  } catch (error) {
+    const status = error.response && error.response.status ? error.response.status : 500;
+    const groqMessage =
+      error.response &&
+      error.response.data &&
+      error.response.data.error &&
+      error.response.data.error.message;
+
+    res.status(status).json({ error: groqMessage || error.message });
+  }
+}
+
+app.get('/api/models', listModels);
+app.get('/models', listModels);
 
 async function suggestReply(req, res) {
   const { postText, tone = 'natural', count = 2 } = req.body || {};
@@ -54,7 +87,7 @@ async function suggestReply(req, res) {
   ].join('\n');
 
   try {
-    const response = await axios.post(GROQ_API_URL, {
+    const response = await axios.post(GROQ_BASE_URL + '/chat/completions', {
       model: GROQ_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -93,8 +126,7 @@ async function suggestReply(req, res) {
 
     const body = { error: groqMessage || error.message };
     if (status === 400 || status === 404) {
-      body.hint =
-        'GROQ_MODEL may name a retired model. Check the current model ids at console.groq.com.';
+      body.hint = 'Open /api/models to see the model ids this key can use, then set GROQ_MODEL to one of them.';
     }
 
     res.status(status).json(body);
