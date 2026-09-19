@@ -1,4 +1,4 @@
-const BACKEND_URL = 'http://localhost:3000';
+const BACKEND_URL = 'https://xreply-six.vercel.app';
 
 document.addEventListener('DOMContentLoaded', async () => {
   const statusEl = document.getElementById('status');
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       statusEl.classList.add('active');
     }
   } catch (err) {
-    statusEl.textContent = 'Backend not running';
+    statusEl.textContent = 'Backend not reachable';
     statusEl.style.color = '#e74c3c';
   }
 

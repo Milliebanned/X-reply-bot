@@ -11,8 +11,7 @@
   "host_permissions": [
     "https://x.com/*",
     "https://twitter.com/*",
-    "http://localhost:3000/*",
-    "https://*.vercel.app/*"
+    "https://xreply-six.vercel.app/*"
   ],
   "background": {
     "service_worker": "background.js"
