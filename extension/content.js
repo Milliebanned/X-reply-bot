@@ -53,11 +53,26 @@ function findComposer() {
   // A reply dialog, when open, holds the composer that belongs to the post
   // being replied to. Prefer it over any other editable on the page.
   const scope = document.querySelector('[role="dialog"]') || document;
-  return (
-    scope.querySelector('[data-testid="tweetTextarea_0"]') ||
-    scope.querySelector('[role="textbox"][contenteditable="true"]') ||
-    document.querySelector('[data-testid="tweetTextarea_0"]')
-  );
+  const selectors = [
+    '[data-testid="tweetTextarea_0"]',
+    '[role="textbox"][contenteditable="true"]',
+    '.public-DraftEditor-content'
+  ];
+
+  for (const selector of selectors) {
+    const element = scope.querySelector(selector) || document.querySelector(selector);
+    if (!element) continue;
+
+    // Some of these selectors match a wrapper rather than the editable
+    // itself. Focusing a wrapper does nothing, and an insert at a caret that
+    // was never created silently does nothing either.
+    if (element.isContentEditable) return element;
+
+    const editable = element.querySelector('[contenteditable="true"]');
+    if (editable) return editable;
+  }
+
+  return null;
 }
 
 function waitForComposer(timeoutMs) {
@@ -95,29 +110,41 @@ async function insertIntoComposer(text) {
   if (!box) return false;
 
   // A paste event is the most widely handled path into these editors.
-  prepareCaret(box);
+  selectAllIn(box);
   pasteInto(box, text);
   if (await textLanded(box, text)) return true;
 
-  prepareCaret(box);
+  selectAllIn(box);
   document.execCommand('insertText', false, text);
   if (await textLanded(box, text)) return true;
 
+  // Neither path took. Clear whatever partial content may be sitting there
+  // so the box is not left in the half-written state this is meant to avoid.
+  clearComposer(box);
   return false;
 }
 
-function prepareCaret(box) {
+// Selects the existing content rather than collapsing to the end, so an
+// insert replaces what is in the box instead of appending to it.
+function selectAllIn(box) {
   box.focus();
 
-  // execCommand and paste both act at the caret, and focus() alone does not
-  // reliably create one inside a contenteditable.
   const range = document.createRange();
   range.selectNodeContents(box);
-  range.collapse(false);
 
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+}
+
+function clearComposer(box) {
+  try {
+    selectAllIn(box);
+    document.execCommand('delete', false, null);
+  } catch (error) {
+    // Nothing further to try; the caller reports failure and uses the
+    // clipboard instead.
+  }
 }
 
 function pasteInto(box, text) {
