@@ -9,18 +9,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const errorEl = document.getElementById('error');
 
   try {
-    const response = await fetch(`${BACKEND_URL}/health`);
-    if (response.ok) {
-      statusEl.textContent = 'Connected';
-      statusEl.classList.add('active');
+    const health = await request('/api/health');
+    statusEl.textContent = 'Connected (' + health.model + ')';
+    statusEl.classList.add('active');
+    if (!health.keyConfigured) {
+      showError('Server is up but GROQ_API_KEY is not set on it.');
     }
   } catch (err) {
-    statusEl.textContent = 'Backend not reachable';
+    statusEl.textContent = 'Backend unreachable: ' + err.message;
     statusEl.style.color = '#e74c3c';
   }
 
+  // Pull the post text from the page when the popup is opened on X.
   chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     chrome.tabs.sendMessage(tab.id, { action: 'getPostContent' }, (response) => {
+      // No content script on this tab (not an X page) - leave the box empty.
+      if (chrome.runtime.lastError) return;
       if (response && response.postText) {
         postTextEl.value = response.postText;
       }
@@ -30,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   generateBtn.addEventListener('click', async () => {
     const postText = postTextEl.value.trim();
     if (!postText) {
-      showError('Please provide post text');
+      showError('Paste the post text first');
       return;
     }
 
@@ -40,21 +44,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorEl.style.display = 'none';
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/suggest-reply`, {
+      const data = await request('/api/suggest-reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          postText,
-          tone: toneEl.value || 'natural'
-        })
+        body: JSON.stringify({ postText, tone: toneEl.value || 'natural' })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate suggestions');
-      }
-
-      const data = await response.json();
       displaySuggestions(data.suggestions || []);
     } catch (err) {
       showError(err.message);
@@ -65,19 +59,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  // Reads the body as text first so a non-JSON response (an HTML error page,
+  // a proxy timeout) reports its status and content instead of failing with a
+  // bare JSON parse error.
+  async function request(path, options) {
+    const response = await fetch(BACKEND_URL + path, options);
+    const raw = await response.text();
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (err) {
+      throw new Error('HTTP ' + response.status + ' - ' + raw.slice(0, 120));
+    }
+
+    if (!response.ok) {
+      throw new Error(data.error || ('HTTP ' + response.status));
+    }
+
+    return data;
+  }
+
   function displaySuggestions(suggestions) {
     suggestionsEl.innerHTML = '';
 
     suggestions.forEach((suggestion, index) => {
       const item = document.createElement('div');
       item.className = 'suggestion-item';
-      item.innerHTML = `
-        <div class="suggestion-text">${escapeHtml(suggestion)}</div>
-        <div class="suggestion-actions">
-          <button class="suggestion-btn use" data-index="${index}">Use This</button>
-          <button class="suggestion-btn" data-index="${index}" data-action="copy">Copy</button>
-        </div>
-      `;
+      item.innerHTML =
+        '<div class="suggestion-text">' + escapeHtml(suggestion) + '</div>' +
+        '<div class="suggestion-actions">' +
+        '<button class="suggestion-btn use" data-index="' + index + '">Use This</button>' +
+        '<button class="suggestion-btn" data-action="copy">Copy</button>' +
+        '</div>';
       suggestionsEl.appendChild(item);
 
       item.querySelector('.use').addEventListener('click', () => {
@@ -86,22 +100,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       item.querySelector('[data-action="copy"]').addEventListener('click', () => {
         navigator.clipboard.writeText(suggestion);
-        alert('Copied to clipboard!');
       });
     });
   }
 
   function useSuggestion(text) {
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-      chrome.tabs.sendMessage(tab.id, {
-        action: 'fillReplyBox',
-        text
-      }, (response) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'fillReplyBox', text }, (response) => {
+        if (chrome.runtime.lastError) {
+          showError('Open a post on x.com first, then use the suggestion.');
+          return;
+        }
         if (response && response.success) {
-          generateBtn.textContent = 'Reply filled! Review and send on X.';
+          generateBtn.textContent = 'Filled - review and send on X';
           setTimeout(() => {
             generateBtn.textContent = 'Generate Reply Options';
           }, 3000);
+        } else {
+          showError('Could not find the reply box - use Copy and paste it instead.');
         }
       });
     });
@@ -120,6 +136,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       '"': '&quot;',
       "'": '&#039;'
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   }
 });

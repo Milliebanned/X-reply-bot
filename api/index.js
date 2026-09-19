@@ -1,4 +1,4 @@
-// Vercel serverless entrypoint.
-// Vercel auto-detects files under /api as functions; this re-exports
-// the same Express app used for local development in backend/server.js.
+// Vercel serverless entrypoint for /api itself.
+// Paths below /api are handled by api/[...path].js; everything outside
+// /api arrives here through the catch-all rewrite in vercel.json.
 module.exports = require('../backend/server.js');
