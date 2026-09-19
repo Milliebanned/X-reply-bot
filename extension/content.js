@@ -1,23 +1,5 @@
 // Runs on x.com pages. Bridges the page and the extension popup.
 
-// Text of the post whose "AI Suggestion" button was clicked. The popup reads
-// this instead of searching the DOM itself, because several posts are on
-// screen at once and only the clicked one is the intended target.
-let selectedPostText = '';
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getPostContent') {
-    sendResponse({ postText: selectedPostText || extractVisiblePostText() });
-    // Consume it, so opening the popup later from the toolbar does not
-    // resurface a post picked minutes ago.
-    selectedPostText = '';
-  }
-
-  if (request.action === 'fillReplyBox') {
-    sendResponse({ success: fillReplyBox(request.text) });
-  }
-});
-
 // Pulls just the post body, skipping the author, timestamp and counters that
 // article.textContent would otherwise include.
 function extractPostText(article) {
@@ -26,9 +8,9 @@ function extractPostText(article) {
   return (body ? body.textContent : article.textContent).trim();
 }
 
-// Fallback when the popup is opened from the toolbar rather than a post
-// button: pick the post nearest the top of the viewport, which is the one
-// being read, rather than the first in the DOM.
+// Used when the popup is opened from the toolbar rather than a post button:
+// pick the post nearest the top of the viewport, which is the one being read,
+// rather than the first one in the DOM.
 function extractVisiblePostText() {
   const articles = Array.from(document.querySelectorAll('article'));
   if (articles.length === 0) return '';
@@ -50,6 +32,16 @@ function extractVisiblePostText() {
 
   return extractPostText(best || articles[0]);
 }
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'getPostContent') {
+    sendResponse({ postText: extractVisiblePostText() });
+  }
+
+  if (request.action === 'fillReplyBox') {
+    sendResponse({ success: fillReplyBox(request.text) });
+  }
+});
 
 function fillReplyBox(text) {
   // Prefer the composer inside an open reply dialog over one elsewhere on
@@ -73,7 +65,7 @@ function fillReplyBox(text) {
 
   // insertText raises the input events X's editor listens for. Assigning
   // textContent changes the DOM but leaves the editor's own state stale, so
-  // the text looks present but the Reply button stays disabled.
+  // the text looks present while the Reply button stays disabled.
   const inserted = document.execCommand('insertText', false, text);
   if (!inserted) {
     box.textContent = text;
@@ -101,12 +93,18 @@ function injectReplyButtons() {
     ].join(';');
 
     button.addEventListener('click', (event) => {
-      // Without this, the click bubbles up to the post and X navigates away.
+      // Without this the click bubbles up and X navigates to the post.
       event.preventDefault();
       event.stopPropagation();
 
-      selectedPostText = extractPostText(article);
-      chrome.runtime.sendMessage({ action: 'openPopup' });
+      // Hand the post to the popup through storage rather than holding it in
+      // this script's memory. Reloading the extension orphans the content
+      // script in already-open tabs, and an orphaned script cannot answer the
+      // popup - storage survives that and needs no messaging round-trip.
+      chrome.storage.local.set(
+        { pendingPost: { text: extractPostText(article), ts: Date.now() } },
+        () => chrome.runtime.sendMessage({ action: 'openPopup' })
+      );
     });
 
     const footer = article.querySelector('[role="group"]');

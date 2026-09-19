@@ -20,16 +20,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     statusEl.style.color = '#e74c3c';
   }
 
-  // Pull the post text from the page when the popup is opened on X.
-  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
-    chrome.tabs.sendMessage(tab.id, { action: 'getPostContent' }, (response) => {
-      // No content script on this tab (not an X page) - leave the box empty.
-      if (chrome.runtime.lastError) return;
-      if (response && response.postText) {
-        postTextEl.value = response.postText;
-      }
+  document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version;
+
+  loadPostText();
+
+  // A post captured by an "AI Suggestion" button click wins over whatever is
+  // on screen now. It arrives through storage, so it does not depend on the
+  // content script still being able to answer messages.
+  async function loadPostText() {
+    const stored = await chrome.storage.local.get('pendingPost');
+    const pending = stored.pendingPost;
+
+    if (pending && Date.now() - pending.ts < 120000) {
+      postTextEl.value = pending.text;
+      await chrome.storage.local.remove('pendingPost');
+      return;
+    }
+
+    // Opened from the toolbar instead: ask the page for the visible post.
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'getPostContent' }, (response) => {
+        // No content script on this tab (not an X page) - leave the box empty.
+        if (chrome.runtime.lastError) return;
+        if (response && response.postText) {
+          postTextEl.value = response.postText;
+        }
+      });
     });
-  });
+  }
 
   generateBtn.addEventListener('click', async () => {
     const postText = postTextEl.value.trim();
