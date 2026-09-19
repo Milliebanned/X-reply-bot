@@ -63,8 +63,17 @@ async function listModels(req, res) {
 app.get('/api/models', listModels);
 app.get('/models', listModels);
 
+// X hard-caps a post at 280 characters, so anything much past 60 words is
+// unusable regardless of what the client asks for.
+function clampMaxWords(value) {
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) return 40;
+  return Math.min(60, Math.max(5, parsed));
+}
+
 async function suggestReply(req, res) {
   const { postText, tone = 'natural', count = 2 } = req.body || {};
+  const maxWords = clampMaxWords(req.body && req.body.maxWords);
 
   if (!postText) {
     return res.status(400).json({ error: 'postText is required' });
@@ -79,7 +88,8 @@ async function suggestReply(req, res) {
     '',
     'Rules:',
     '- Produce exactly ' + count + ' distinct replies.',
-    '- Each reply must be under 280 characters.',
+    '- Each reply must be at most ' + maxWords + ' words.',
+    '- Each reply must stay under 280 characters, which X enforces.',
     '- Tone: ' + tone + '.',
     '- Sound like a real person, not a brand. No hashtags, no emoji spam.',
     '- Say something of substance: a point, a question, a specific detail.',
@@ -94,7 +104,9 @@ async function suggestReply(req, res) {
         { role: 'user', content: 'Write replies to this post:\n\n' + postText }
       ],
       temperature: 0.8,
-      max_tokens: 500
+      // Roughly four tokens per requested word, with headroom for the
+      // numbering, so a larger word budget is not cut off mid-reply.
+      max_tokens: Math.min(1200, 100 + count * maxWords * 4)
     }, {
       headers: {
         Authorization: 'Bearer ' + GROQ_API_KEY,
@@ -113,7 +125,7 @@ async function suggestReply(req, res) {
       });
     }
 
-    res.json({ suggestions, model: GROQ_MODEL, tone });
+    res.json({ suggestions, model: GROQ_MODEL, tone, maxWords });
   } catch (error) {
     const status = error.response && error.response.status ? error.response.status : 500;
     const groqMessage =

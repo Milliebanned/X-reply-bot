@@ -7,6 +7,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toneEl = document.getElementById('tone');
   const suggestionsEl = document.getElementById('suggestions');
   const errorEl = document.getElementById('error');
+  const maxWordsEl = document.getElementById('maxWords');
+  const savedHintEl = document.getElementById('savedHint');
+
+  // Persisted so the tone and length do not have to be re-entered on every
+  // reply. Kept in extension storage, which survives popup closes and
+  // browser restarts.
+  const SETTINGS_DEFAULTS = { tone: '', maxWords: 40 };
+  let saveTimer = null;
+
+  await restoreSettings();
+  toneEl.addEventListener('input', scheduleSave);
+  maxWordsEl.addEventListener('input', scheduleSave);
+
+  async function restoreSettings() {
+    const stored = await chrome.storage.local.get('settings');
+    const settings = Object.assign({}, SETTINGS_DEFAULTS, stored.settings);
+    toneEl.value = settings.tone;
+    maxWordsEl.value = settings.maxWords;
+  }
+
+  // Debounced so typing a tone does not write on every keystroke.
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSettings, 300);
+  }
+
+  async function saveSettings() {
+    await chrome.storage.local.set({
+      settings: {
+        tone: toneEl.value.trim(),
+        maxWords: readMaxWords()
+      }
+    });
+
+    savedHintEl.textContent = 'Saved';
+    savedHintEl.classList.add('flash');
+    setTimeout(() => {
+      savedHintEl.textContent = 'Tone and length are saved automatically';
+      savedHintEl.classList.remove('flash');
+    }, 1200);
+  }
+
+  // The number input allows anything typed by hand, so clamp to the range the
+  // server accepts rather than sending a value it will silently override.
+  function readMaxWords() {
+    const parsed = parseInt(maxWordsEl.value, 10);
+    if (isNaN(parsed)) return SETTINGS_DEFAULTS.maxWords;
+    return Math.min(60, Math.max(5, parsed));
+  }
 
   try {
     const health = await request('/api/health');
@@ -62,10 +111,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     errorEl.style.display = 'none';
 
     try {
+      await saveSettings();
+
       const data = await request('/api/suggest-reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postText, tone: toneEl.value || 'natural' })
+        body: JSON.stringify({
+          postText,
+          tone: toneEl.value.trim() || 'natural',
+          maxWords: readMaxWords()
+        })
       });
       displaySuggestions(data.suggestions || []);
     } catch (err) {

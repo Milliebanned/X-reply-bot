@@ -14,6 +14,11 @@
     .section { margin-bottom: 16px; }
     .section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; color: #666; margin-bottom: 8px; }
     .input-group { margin-bottom: 12px; }
+    .settings-row { display: flex; gap: 8px; }
+    .settings-row .input-group { flex: 1; }
+    .settings-row .input-group.narrow { flex: 0 0 96px; }
+    .saved-hint { font-size: 11px; color: #999; margin: -4px 0 12px; }
+    .saved-hint.flash { color: #1da1f2; }
     label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: #555; }
     input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 12px; }
     textarea { resize: vertical; min-height: 80px; }
@@ -44,10 +49,17 @@
 
     <div class="section">
       <div class="section-title">Generate Suggestions</div>
-      <div class="input-group">
-        <label for="tone">Reply Tone (optional)</label>
-        <input type="text" id="tone" placeholder="e.g., witty, helpful, critical">
+      <div class="settings-row">
+        <div class="input-group">
+          <label for="tone">Reply Tone (optional)</label>
+          <input type="text" id="tone" placeholder="e.g., witty, helpful, critical">
+        </div>
+        <div class="input-group narrow">
+          <label for="maxWords">Max words</label>
+          <input type="number" id="maxWords" min="5" max="60" step="1">
+        </div>
       </div>
+      <div class="saved-hint" id="savedHint">Tone and length are saved automatically</div>
       <button id="generateBtn">Generate Reply Options</button>
     </div>
 
