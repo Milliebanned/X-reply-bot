@@ -22,6 +22,7 @@
     label { display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: #555; }
     input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 12px; }
     textarea { resize: vertical; min-height: 80px; }
+    #bannedWords { min-height: 44px; }
     button { width: 100%; padding: 10px; background: #1da1f2; color: white; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
     button:hover { background: #1a91da; }
     button:disabled { background: #ccc; cursor: not-allowed; }
@@ -59,7 +60,11 @@
           <input type="number" id="maxWords" min="5" max="60" step="1">
         </div>
       </div>
-      <div class="saved-hint" id="savedHint">Tone and length are saved automatically</div>
+      <div class="input-group">
+        <label for="bannedWords">Banned words and phrases</label>
+        <textarea id="bannedWords" rows="2" placeholder="sounds, absolutely, great point"></textarea>
+      </div>
+      <div class="saved-hint" id="savedHint">Settings are saved automatically</div>
       <button id="generateBtn">Generate Reply Options</button>
     </div>
 

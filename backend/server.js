@@ -71,9 +71,80 @@ function clampMaxWords(value) {
   return Math.min(60, Math.max(5, parsed));
 }
 
+// Terms the user has banned. Normalised here rather than trusted from the
+// client: the list is pasted by hand, so it arrives with duplicates, blanks
+// and stray casing.
+function parseBannedWords(value) {
+  const raw = Array.isArray(value) ? value : String(value || '').split(/[,\n]/);
+  const seen = Object.create(null);
+  const terms = [];
+
+  raw.forEach(function (item) {
+    const term = String(item).trim().toLowerCase();
+    if (!term || term.length > 40 || seen[term]) return;
+    seen[term] = true;
+    terms.push(term);
+  });
+
+  return terms.slice(0, 40);
+}
+
+// Matches on word boundaries so banning "sounds" does not also reject
+// "soundscape", while still catching multi-word phrases.
+function findBannedTerm(text, terms) {
+  for (let i = 0; i < terms.length; i++) {
+    const escaped = terms[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp('(^|[^a-z0-9])' + escaped + '($|[^a-z0-9])', 'i').test(text)) {
+      return terms[i];
+    }
+  }
+  return null;
+}
+
+function firstBannedTerm(suggestions, terms) {
+  if (terms.length === 0) return null;
+
+  for (let i = 0; i < suggestions.length; i++) {
+    const hit = findBannedTerm(suggestions[i], terms);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+async function generateSuggestions(payload, count) {
+  let response;
+
+  try {
+    response = await callGroq(payload);
+  } catch (error) {
+    // Retry without the tuning parameter if this model rejects it, rather
+    // than failing the request outright.
+    if (isBadParameter(error) && payload.reasoning_effort) {
+      const retry = Object.assign({}, payload);
+      delete retry.reasoning_effort;
+      response = await callGroq(retry);
+    } else {
+      throw error;
+    }
+  }
+
+  const message = response.data.choices[0].message;
+
+  // Some reasoning models put the answer under `reasoning` when `content`
+  // comes back empty.
+  const content = message.content || message.reasoning || '';
+
+  return {
+    suggestions: parseReplySuggestions(content, count).map(stripTells).filter(Boolean),
+    content: content,
+    finishReason: response.data.choices[0].finish_reason
+  };
+}
+
 async function suggestReply(req, res) {
   const { postText, tone = 'natural', count = 2 } = req.body || {};
   const maxWords = clampMaxWords(req.body && req.body.maxWords);
+  const banned = parseBannedWords(req.body && req.body.bannedWords);
 
   if (!postText) {
     return res.status(400).json({ error: 'postText is required' });
@@ -87,22 +158,29 @@ async function suggestReply(req, res) {
 
   // Kept short deliberately: every token here is read before generation
   // starts, so a long preamble costs latency on every single reply.
-  const systemPrompt = [
+  const rules = [
     'You write replies to posts on X.',
     single ? 'Write exactly one reply.' : 'Write ' + count + ' distinct replies.',
     'At most ' + maxWords + ' words, under 280 characters.',
     'Tone: ' + tone + '.',
     'Sound like a person, not a brand. No hashtags.',
-    'Never use em dashes or en dashes. Use a comma or a full stop.',
+    'Never use em dashes or en dashes. Use a comma or a full stop.'
+  ];
+
+  if (banned.length > 0) {
+    rules.push('Never use these words or phrases: ' + banned.join(', ') + '.');
+  }
+
+  rules.push(
     single
       ? 'Output the reply text only, with no quotes or preamble.'
       : 'Output a numbered list, one reply per line.'
-  ].join('\n');
+  );
 
   const payload = {
     model: GROQ_MODEL,
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: rules.join('\n') },
       { role: 'user', content: postText }
     ],
     temperature: 0.8,
@@ -120,43 +198,61 @@ async function suggestReply(req, res) {
   const startedAt = Date.now();
 
   try {
-    let response;
-    try {
-      response = await callGroq(payload);
-    } catch (error) {
-      // Retry without the tuning parameter if this model rejects it, rather
-      // than failing the request outright.
-      if (isBadParameter(error) && payload.reasoning_effort) {
-        delete payload.reasoning_effort;
-        response = await callGroq(payload);
-      } else {
-        throw error;
+    let result = await generateSuggestions(payload, count);
+    let hit = firstBannedTerm(result.suggestions, banned);
+    let regenerated = false;
+
+    // Naming the offending term works far better than repeating the list,
+    // and one extra call is the most latency worth spending on this.
+    if (hit && result.suggestions.length > 0) {
+      const secondPayload = Object.assign({}, payload, {
+        temperature: 0.95,
+        messages: payload.messages.concat([
+          { role: 'assistant', content: result.suggestions[0] },
+          {
+            role: 'user',
+            content:
+              'You used the banned word "' + hit + '". Rewrite completely, ' +
+              'avoiding it and every other banned word. Output the reply only.'
+          }
+        ])
+      });
+
+      const second = await generateSuggestions(secondPayload, count);
+
+      if (second.suggestions.length > 0) {
+        regenerated = true;
+        // Keep the retry only if it is actually clean, otherwise the first
+        // attempt is no worse.
+        if (!firstBannedTerm(second.suggestions, banned)) {
+          result = second;
+          hit = null;
+        } else {
+          hit = firstBannedTerm(second.suggestions, banned);
+          result = second;
+        }
       }
     }
 
-    const message = response.data.choices[0].message;
-
-    // Some reasoning models put the answer under `reasoning` when `content`
-    // comes back empty.
-    const content = message.content || message.reasoning || '';
-    const suggestions = parseReplySuggestions(content, count)
-      .map(stripTells)
-      .filter(Boolean);
-
-    if (suggestions.length === 0) {
+    if (result.suggestions.length === 0) {
       return res.status(502).json({
         error: 'The model returned nothing usable',
         hint: 'A reasoning model may have spent its token budget thinking. Try a smaller model via GROQ_MODEL.',
-        raw: content.slice(0, 200),
-        finishReason: response.data.choices[0].finish_reason
+        raw: result.content.slice(0, 200),
+        finishReason: result.finishReason
       });
     }
 
     res.json({
-      suggestions,
+      suggestions: result.suggestions,
       model: GROQ_MODEL,
       tone,
       maxWords,
+      banned: banned.length,
+      regenerated: regenerated,
+      // Surfaced rather than hidden: the model kept a banned term even after
+      // being told, so the reply is returned but flagged.
+      bannedTermUsed: hit || undefined,
       ms: Date.now() - startedAt
     });
   } catch (error) {

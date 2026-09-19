@@ -8,23 +8,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   const suggestionsEl = document.getElementById('suggestions');
   const errorEl = document.getElementById('error');
   const maxWordsEl = document.getElementById('maxWords');
+  const bannedWordsEl = document.getElementById('bannedWords');
   const savedHintEl = document.getElementById('savedHint');
 
   // Persisted so the tone and length do not have to be re-entered on every
   // reply. Kept in extension storage, which survives popup closes and
   // browser restarts.
-  const SETTINGS_DEFAULTS = { tone: '', maxWords: 40 };
+  const SETTINGS_DEFAULTS = {
+    tone: '',
+    maxWords: 40,
+    // A starter list of the phrases that most read as bot-written. Edit
+    // or clear it; whatever is here is what gets banned.
+    bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve'
+  };
   let saveTimer = null;
 
   await restoreSettings();
   toneEl.addEventListener('input', scheduleSave);
   maxWordsEl.addEventListener('input', scheduleSave);
+  bannedWordsEl.addEventListener('input', scheduleSave);
 
   async function restoreSettings() {
     const stored = await chrome.storage.local.get('settings');
     const settings = Object.assign({}, SETTINGS_DEFAULTS, stored.settings);
     toneEl.value = settings.tone;
     maxWordsEl.value = settings.maxWords;
+    bannedWordsEl.value = settings.bannedWords;
   }
 
   // Debounced so typing a tone does not write on every keystroke.
@@ -37,14 +46,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.set({
       settings: {
         tone: toneEl.value.trim(),
-        maxWords: readMaxWords()
+        maxWords: readMaxWords(),
+        bannedWords: bannedWordsEl.value.trim()
       }
     });
 
     savedHintEl.textContent = 'Saved';
     savedHintEl.classList.add('flash');
     setTimeout(() => {
-      savedHintEl.textContent = 'Tone and length are saved automatically';
+      savedHintEl.textContent = 'Settings are saved automatically';
       savedHintEl.classList.remove('flash');
     }, 1200);
   }
@@ -120,6 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           postText,
           tone: toneEl.value.trim() || 'natural',
           maxWords: readMaxWords(),
+          bannedWords: bannedWordsEl.value.trim(),
           count: 1
         })
       });

@@ -1,7 +1,11 @@
 // Runs on x.com pages. Clicking the injected button generates one reply and
 // puts it straight into the post's reply box, ready to edit and send.
 
-const SETTINGS_DEFAULTS = { tone: '', maxWords: 40 };
+const SETTINGS_DEFAULTS = {
+  tone: '',
+  maxWords: 40,
+  bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve'
+};
 
 // Pulls just the post body, skipping the author, timestamp and counters that
 // article.textContent would otherwise include.

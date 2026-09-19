@@ -30,6 +30,7 @@ async function generateReply(postText, settings) {
       postText: postText,
       tone: (settings && settings.tone) || 'natural',
       maxWords: (settings && settings.maxWords) || 40,
+      bannedWords: (settings && settings.bannedWords) || '',
       count: 1
     })
   });
