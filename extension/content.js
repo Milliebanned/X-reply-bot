@@ -39,10 +39,13 @@ function extractVisiblePostText() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getPostContent') {
     sendResponse({ postText: extractVisiblePostText() });
+    return;
   }
 
   if (request.action === 'fillReplyBox') {
-    sendResponse({ success: insertIntoComposer(request.text) });
+    insertIntoComposer(request.text).then((success) => sendResponse({ success: success }));
+    // Keeps the channel open for the async insert above.
+    return true;
   }
 });
 
@@ -81,16 +84,33 @@ function openReplyComposer(article) {
   return waitForComposer();
 }
 
-function insertIntoComposer(text) {
+// X's composer is a rich-text editor holding its own document model. Writing
+// box.textContent puts characters on screen without telling the editor, which
+// still believes the box is empty - backspace then deletes against a model
+// that does not match what is displayed and leaves fragments behind. Both
+// methods here go through the editor so its model and the DOM stay in step,
+// and each is verified rather than assumed.
+async function insertIntoComposer(text) {
   const box = findComposer();
   if (!box) return false;
 
+  // A paste event is the most widely handled path into these editors.
+  prepareCaret(box);
+  pasteInto(box, text);
+  if (await textLanded(box, text)) return true;
+
+  prepareCaret(box);
+  document.execCommand('insertText', false, text);
+  if (await textLanded(box, text)) return true;
+
+  return false;
+}
+
+function prepareCaret(box) {
   box.focus();
 
-  // execCommand inserts at the caret, and focus() alone does not reliably
-  // create one in a contenteditable. Without a collapsed range inside the
-  // box the call is a silent no-op, which is what made the text land via the
-  // fallback below and come out uneditable.
+  // execCommand and paste both act at the caret, and focus() alone does not
+  // reliably create one inside a contenteditable.
   const range = document.createRange();
   range.selectNodeContents(box);
   range.collapse(false);
@@ -98,16 +118,41 @@ function insertIntoComposer(text) {
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
+}
 
-  if (document.execCommand('insertText', false, text)) return true;
+function pasteInto(box, text) {
+  try {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    box.dispatchEvent(
+      new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data })
+    );
+  } catch (error) {
+    // Older engines reject a synthesised ClipboardEvent; the caller falls
+    // through to execCommand.
+  }
+}
 
-  // Last resort. The text becomes visible but X's editor state stays empty,
-  // so the Reply button can remain disabled and edits may not stick.
-  box.textContent = text;
-  box.dispatchEvent(
-    new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' })
-  );
-  return true;
+// The editor commits asynchronously, so poll briefly rather than checking
+// once and wrongly reporting failure.
+function textLanded(box, text) {
+  return new Promise((resolve) => {
+    let attempts = 0;
+
+    (function check() {
+      if (boxContains(box, text)) return resolve(true);
+      if (++attempts > 12) return resolve(false);
+      setTimeout(check, 30);
+    })();
+  });
+}
+
+function boxContains(box, text) {
+  // Compare a normalised prefix: the editor may re-wrap whitespace, so an
+  // exact match is too strict.
+  const needle = text.trim().slice(0, 24).replace(/\s+/g, ' ');
+  const haystack = (box.textContent || '').replace(/\s+/g, ' ');
+  return needle.length > 0 && haystack.indexOf(needle) !== -1;
 }
 
 async function getSettings() {
@@ -153,7 +198,7 @@ async function handleSuggestClick(article, button) {
       openReplyComposer(article)
     ]);
 
-    if (!insertIntoComposer(reply)) {
+    if (!(await insertIntoComposer(reply))) {
       await navigator.clipboard.writeText(reply);
       flashButton(button, 'Copied - paste it');
       return;
