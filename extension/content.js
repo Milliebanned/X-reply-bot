@@ -1,4 +1,7 @@
-// Runs on x.com pages. Bridges the page and the extension popup.
+// Runs on x.com pages. Clicking the injected button generates one reply and
+// puts it straight into the post's reply box, ready to edit and send.
+
+const SETTINGS_DEFAULTS = { tone: '', maxWords: 40 };
 
 // Pulls just the post body, skipping the author, timestamp and counters that
 // article.textContent would otherwise include.
@@ -39,40 +42,136 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'fillReplyBox') {
-    sendResponse({ success: fillReplyBox(request.text) });
+    sendResponse({ success: insertIntoComposer(request.text) });
   }
 });
 
-function fillReplyBox(text) {
-  // Prefer the composer inside an open reply dialog over one elsewhere on
-  // the page.
+function findComposer() {
+  // A reply dialog, when open, holds the composer that belongs to the post
+  // being replied to. Prefer it over any other editable on the page.
   const scope = document.querySelector('[role="dialog"]') || document;
-  const selectors = [
-    '[data-testid="tweetTextarea_0"]',
-    '[role="textbox"][contenteditable="true"]',
-    '.public-DraftEditor-content'
-  ];
+  return (
+    scope.querySelector('[data-testid="tweetTextarea_0"]') ||
+    scope.querySelector('[role="textbox"][contenteditable="true"]') ||
+    document.querySelector('[data-testid="tweetTextarea_0"]')
+  );
+}
 
-  let box = null;
-  for (const selector of selectors) {
-    box = scope.querySelector(selector) || document.querySelector(selector);
-    if (box) break;
-  }
+function waitForComposer(timeoutMs) {
+  const deadline = Date.now() + (timeoutMs || 5000);
 
+  return new Promise((resolve, reject) => {
+    (function poll() {
+      const box = findComposer();
+      if (box) return resolve(box);
+      if (Date.now() > deadline) return reject(new Error('Reply box did not open'));
+      setTimeout(poll, 100);
+    })();
+  });
+}
+
+// Opens the reply composer for this specific post, unless one is already open.
+function openReplyComposer(article) {
+  if (findComposer()) return Promise.resolve();
+
+  const replyButton = article.querySelector('[data-testid="reply"]');
+  if (!replyButton) return Promise.reject(new Error('Reply button not found'));
+
+  replyButton.click();
+  return waitForComposer();
+}
+
+function insertIntoComposer(text) {
+  const box = findComposer();
   if (!box) return false;
 
   box.focus();
 
-  // insertText raises the input events X's editor listens for. Assigning
-  // textContent changes the DOM but leaves the editor's own state stale, so
-  // the text looks present while the Reply button stays disabled.
-  const inserted = document.execCommand('insertText', false, text);
-  if (!inserted) {
-    box.textContent = text;
-    box.dispatchEvent(new Event('input', { bubbles: true }));
+  // execCommand inserts at the caret, and focus() alone does not reliably
+  // create one in a contenteditable. Without a collapsed range inside the
+  // box the call is a silent no-op, which is what made the text land via the
+  // fallback below and come out uneditable.
+  const range = document.createRange();
+  range.selectNodeContents(box);
+  range.collapse(false);
+
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  if (document.execCommand('insertText', false, text)) return true;
+
+  // Last resort. The text becomes visible but X's editor state stays empty,
+  // so the Reply button can remain disabled and edits may not stick.
+  box.textContent = text;
+  box.dispatchEvent(
+    new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' })
+  );
+  return true;
+}
+
+async function getSettings() {
+  const stored = await chrome.storage.local.get('settings');
+  return Object.assign({}, SETTINGS_DEFAULTS, stored.settings);
+}
+
+// The background worker performs the request: it holds the extension's host
+// permissions, so the call is not subject to the page's CORS rules.
+function requestReply(postText, settings) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { action: 'generateReply', postText: postText, settings: settings },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        if (!response || !response.ok) {
+          return reject(new Error((response && response.error) || 'No response'));
+        }
+        resolve(response.reply);
+      }
+    );
+  });
+}
+
+async function handleSuggestClick(article, button) {
+  const postText = extractPostText(article);
+  if (!postText) {
+    return flashButton(button, 'No post text');
   }
 
-  return true;
+  button.disabled = true;
+  button.textContent = 'Generating...';
+
+  try {
+    const settings = await getSettings();
+
+    // Open the composer while the request is in flight, so the reply lands as
+    // soon as it arrives.
+    const [reply] = await Promise.all([
+      requestReply(postText, settings),
+      openReplyComposer(article)
+    ]);
+
+    if (!insertIntoComposer(reply)) {
+      await navigator.clipboard.writeText(reply);
+      flashButton(button, 'Copied - paste it');
+      return;
+    }
+
+    flashButton(button, 'Filled');
+  } catch (error) {
+    flashButton(button, error.message.slice(0, 40));
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function flashButton(button, message) {
+  button.textContent = message;
+  setTimeout(() => {
+    button.textContent = 'AI Reply';
+  }, 2500);
 }
 
 function injectReplyButtons() {
@@ -80,7 +179,7 @@ function injectReplyButtons() {
     if (article.dataset.copilotButtonAdded) return;
 
     const button = document.createElement('button');
-    button.textContent = 'AI Suggestion';
+    button.textContent = 'AI Reply';
     button.style.cssText = [
       'padding: 4px 12px',
       'font-size: 12px',
@@ -96,15 +195,7 @@ function injectReplyButtons() {
       // Without this the click bubbles up and X navigates to the post.
       event.preventDefault();
       event.stopPropagation();
-
-      // Hand the post to the popup through storage rather than holding it in
-      // this script's memory. Reloading the extension orphans the content
-      // script in already-open tabs, and an orphaned script cannot answer the
-      // popup - storage survives that and needs no messaging round-trip.
-      chrome.storage.local.set(
-        { pendingPost: { text: extractPostText(article), ts: Date.now() } },
-        () => chrome.runtime.sendMessage({ action: 'openPopup' })
-      );
+      handleSuggestClick(article, button);
     });
 
     const footer = article.querySelector('[role="group"]');

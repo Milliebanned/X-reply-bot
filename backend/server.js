@@ -83,17 +83,23 @@ async function suggestReply(req, res) {
     return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server' });
   }
 
+  const single = count === 1;
+
   const systemPrompt = [
-    'You write reply suggestions for posts on X (Twitter).',
+    'You write replies to posts on X (Twitter).',
     '',
     'Rules:',
-    '- Produce exactly ' + count + ' distinct replies.',
-    '- Each reply must be at most ' + maxWords + ' words.',
-    '- Each reply must stay under 280 characters, which X enforces.',
+    single
+      ? '- Write exactly one reply.'
+      : '- Write exactly ' + count + ' distinct replies.',
+    '- Stay at or under ' + maxWords + ' words.',
+    '- Stay under 280 characters, which X enforces.',
     '- Tone: ' + tone + '.',
     '- Sound like a real person, not a brand. No hashtags, no emoji spam.',
     '- Say something of substance: a point, a question, a specific detail.',
-    '- Output only a numbered list, one reply per line, e.g. "1. ..."'
+    single
+      ? '- Output the reply text only. No numbering, quotes, labels or preamble.'
+      : '- Output only a numbered list, one reply per line, e.g. "1. ..."'
   ].join('\n');
 
   try {
@@ -116,7 +122,7 @@ async function suggestReply(req, res) {
     });
 
     const content = response.data.choices[0].message.content;
-    const suggestions = parseReplySuggestions(content);
+    const suggestions = parseReplySuggestions(content, count);
 
     if (suggestions.length === 0) {
       return res.status(502).json({
@@ -148,7 +154,14 @@ async function suggestReply(req, res) {
 app.post('/api/suggest-reply', suggestReply);
 app.post('/suggest-reply', suggestReply);
 
-function parseReplySuggestions(text) {
+function parseReplySuggestions(text, count) {
+  // A single reply is asked for unnumbered, so the whole response is the
+  // reply. Splitting it on newlines would cut a multi-sentence answer apart.
+  if (count === 1) {
+    const cleaned = stripQuotes(text.replace(/^\s*\d+[\.\)]\s*/, ''));
+    return cleaned ? [cleaned] : [];
+  }
+
   const suggestions = [];
 
   text.split('\n').forEach(function (line) {

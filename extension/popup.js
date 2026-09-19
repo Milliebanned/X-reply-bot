@@ -119,7 +119,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         body: JSON.stringify({
           postText,
           tone: toneEl.value.trim() || 'natural',
-          maxWords: readMaxWords()
+          maxWords: readMaxWords(),
+          count: 1
         })
       });
       displaySuggestions(data.suggestions || []);
