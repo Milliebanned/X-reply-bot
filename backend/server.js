@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-const GROQ_MODEL = (process.env.GROQ_MODEL || '').trim() || 'openai/gpt-oss-120b';
+const GROQ_MODEL = (process.env.GROQ_MODEL || '').trim() || 'openai/gpt-oss-20b';
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
 function health(req, res) {
@@ -85,53 +85,77 @@ async function suggestReply(req, res) {
 
   const single = count === 1;
 
+  // Kept short deliberately: every token here is read before generation
+  // starts, so a long preamble costs latency on every single reply.
   const systemPrompt = [
-    'You write replies to posts on X (Twitter).',
-    '',
-    'Rules:',
+    'You write replies to posts on X.',
+    single ? 'Write exactly one reply.' : 'Write ' + count + ' distinct replies.',
+    'At most ' + maxWords + ' words, under 280 characters.',
+    'Tone: ' + tone + '.',
+    'Sound like a person, not a brand. No hashtags.',
     single
-      ? '- Write exactly one reply.'
-      : '- Write exactly ' + count + ' distinct replies.',
-    '- Stay at or under ' + maxWords + ' words.',
-    '- Stay under 280 characters, which X enforces.',
-    '- Tone: ' + tone + '.',
-    '- Sound like a real person, not a brand. No hashtags, no emoji spam.',
-    '- Say something of substance: a point, a question, a specific detail.',
-    single
-      ? '- Output the reply text only. No numbering, quotes, labels or preamble.'
-      : '- Output only a numbered list, one reply per line, e.g. "1. ..."'
+      ? 'Output the reply text only, with no quotes or preamble.'
+      : 'Output a numbered list, one reply per line.'
   ].join('\n');
 
-  try {
-    const response = await axios.post(GROQ_BASE_URL + '/chat/completions', {
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Write replies to this post:\n\n' + postText }
-      ],
-      temperature: 0.8,
-      // Roughly four tokens per requested word, with headroom for the
-      // numbering, so a larger word budget is not cut off mid-reply.
-      max_tokens: Math.min(1200, 100 + count * maxWords * 4)
-    }, {
-      headers: {
-        Authorization: 'Bearer ' + GROQ_API_KEY,
-        'Content-Type': 'application/json'
-      },
-      timeout: 20000
-    });
+  const payload = {
+    model: GROQ_MODEL,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: postText }
+    ],
+    temperature: 0.8,
+    max_tokens: Math.min(1200, 120 + count * maxWords * 4)
+  };
 
-    const content = response.data.choices[0].message.content;
+  // gpt-oss models reason before answering. Left at the default effort they
+  // are slow, and the reasoning can consume the whole token budget and leave
+  // message.content empty - which is what surfaced as a reply that returned
+  // nothing. Low effort keeps them brief and quick.
+  if (GROQ_MODEL.indexOf('gpt-oss') !== -1) {
+    payload.reasoning_effort = 'low';
+  }
+
+  const startedAt = Date.now();
+
+  try {
+    let response;
+    try {
+      response = await callGroq(payload);
+    } catch (error) {
+      // Retry without the tuning parameter if this model rejects it, rather
+      // than failing the request outright.
+      if (isBadParameter(error) && payload.reasoning_effort) {
+        delete payload.reasoning_effort;
+        response = await callGroq(payload);
+      } else {
+        throw error;
+      }
+    }
+
+    const message = response.data.choices[0].message;
+
+    // Some reasoning models put the answer under `reasoning` when `content`
+    // comes back empty.
+    const content = message.content || message.reasoning || '';
     const suggestions = parseReplySuggestions(content, count);
 
     if (suggestions.length === 0) {
       return res.status(502).json({
         error: 'The model returned nothing usable',
-        raw: content
+        hint: 'A reasoning model may have spent its token budget thinking. Try a smaller model via GROQ_MODEL.',
+        raw: content.slice(0, 200),
+        finishReason: response.data.choices[0].finish_reason
       });
     }
 
-    res.json({ suggestions, model: GROQ_MODEL, tone, maxWords });
+    res.json({
+      suggestions,
+      model: GROQ_MODEL,
+      tone,
+      maxWords,
+      ms: Date.now() - startedAt
+    });
   } catch (error) {
     const status = error.response && error.response.status ? error.response.status : 500;
     const groqMessage =
@@ -149,6 +173,28 @@ async function suggestReply(req, res) {
 
     res.status(status).json(body);
   }
+}
+
+function callGroq(payload) {
+  return axios.post(GROQ_BASE_URL + '/chat/completions', payload, {
+    headers: {
+      Authorization: 'Bearer ' + GROQ_API_KEY,
+      'Content-Type': 'application/json'
+    },
+    timeout: 20000
+  });
+}
+
+function isBadParameter(error) {
+  const status = error.response && error.response.status;
+  const message =
+    (error.response &&
+      error.response.data &&
+      error.response.data.error &&
+      error.response.data.error.message) ||
+    '';
+
+  return status === 400 && /unsupported|unknown|unrecognized|invalid/i.test(message);
 }
 
 app.post('/api/suggest-reply', suggestReply);
