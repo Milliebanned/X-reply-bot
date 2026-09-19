@@ -206,7 +206,40 @@ function requestReply(postText, settings) {
   });
 }
 
+// After the extension is reloaded or updated, scripts already injected into
+// open tabs keep running but lose their connection to it. Every chrome.*
+// call then throws "Extension context invalidated". Only a fresh page load
+// injects a working script, so the buttons say so rather than repeating an
+// error the page cannot recover from.
+function extensionAlive() {
+  try {
+    return Boolean(chrome.runtime && chrome.runtime.id);
+  } catch (error) {
+    return false;
+  }
+}
+
+function markStale(button) {
+  document.querySelectorAll('[data-copilot-button]').forEach((stale) => {
+    stale.dataset.stale = 'true';
+    stale.disabled = false;
+    stale.textContent = 'Refresh page';
+    stale.title = 'The extension was updated. Reload this tab to reconnect it.';
+    stale.style.background = '#8899a6';
+  });
+
+  if (button) button.focus();
+}
+
+function isContextError(error) {
+  return /context invalidated|receiving end does not exist/i.test(error.message || '');
+}
+
 async function handleSuggestClick(article, button) {
+  if (!extensionAlive()) {
+    return markStale(button);
+  }
+
   const postText = extractPostText(article);
   if (!postText) {
     return flashButton(button, 'No post text');
@@ -233,9 +266,13 @@ async function handleSuggestClick(article, button) {
 
     flashButton(button, 'Filled');
   } catch (error) {
+    if (isContextError(error) || !extensionAlive()) {
+      markStale(button);
+      return;
+    }
     flashButton(button, error.message.slice(0, 40));
   } finally {
-    button.disabled = false;
+    if (button.dataset.stale !== 'true') button.disabled = false;
   }
 }
 
@@ -263,10 +300,19 @@ function injectReplyButtons() {
       'margin-left: 8px'
     ].join(';');
 
+    button.dataset.copilotButton = 'true';
+
     button.addEventListener('click', (event) => {
       // Without this the click bubbles up and X navigates to the post.
       event.preventDefault();
       event.stopPropagation();
+
+      // Once stale, the only useful action the button has left is reloading.
+      if (button.dataset.stale === 'true') {
+        location.reload();
+        return;
+      }
+
       handleSuggestClick(article, button);
     });
 

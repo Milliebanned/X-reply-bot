@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "X Reply Copilot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "AI-powered reply suggestions for X (Twitter)",
   "permissions": [
     "activeTab",
