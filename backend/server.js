@@ -111,6 +111,26 @@ function firstBannedTerm(suggestions, terms) {
   return null;
 }
 
+// Reasoning models emit a scratchpad. It must never reach the reply box, so
+// it is detected rather than trusted: word-by-word counting, drafting aloud
+// and addressing the instructions are all things a real reply never does.
+const REASONING_MARKERS = [
+  // Phrases that address the task rather than the person being replied to.
+  /\blet'?s craft\b/i,
+  /\bi should write\b/i,
+  /\bthe user (wants|asked|said)\b/i,
+  // Explicit word accounting, which a reply never does.
+  /\bcount(ing)? (the )?words\b/i,
+  /\w+\(\d+\)[\s,]+\w+\(\d+\)/,
+  /\bneed\s*<=?\s*\d+\s*words\b/i,
+  /\b\d+\s*words max\b/i
+];
+
+function looksLikeReasoning(text) {
+  if (!text) return false;
+  return REASONING_MARKERS.some(function (pattern) { return pattern.test(text); });
+}
+
 async function generateSuggestions(payload, count) {
   let response;
 
@@ -119,9 +139,10 @@ async function generateSuggestions(payload, count) {
   } catch (error) {
     // Retry without the tuning parameter if this model rejects it, rather
     // than failing the request outright.
-    if (isBadParameter(error) && payload.reasoning_effort) {
+    if (isBadParameter(error) && (payload.reasoning_effort || payload.reasoning_format)) {
       const retry = Object.assign({}, payload);
       delete retry.reasoning_effort;
+      delete retry.reasoning_format;
       response = await callGroq(retry);
     } else {
       throw error;
@@ -130,12 +151,15 @@ async function generateSuggestions(payload, count) {
 
   const message = response.data.choices[0].message;
 
-  // Some reasoning models put the answer under `reasoning` when `content`
-  // comes back empty.
-  const content = message.content || message.reasoning || '';
+  // Only `content` is ever the answer. `reasoning` holds the model's working
+  // out, and reading it as a reply is what put a scratchpad in the reply box.
+  const content = message.content || '';
 
   return {
-    suggestions: parseReplySuggestions(content, count).map(stripTells).filter(Boolean),
+    suggestions: parseReplySuggestions(content, count)
+      .map(stripTells)
+      .filter(Boolean)
+      .filter(function (suggestion) { return !looksLikeReasoning(suggestion); }),
     content: content,
     finishReason: response.data.choices[0].finish_reason
   };
@@ -155,6 +179,7 @@ async function suggestReply(req, res) {
   }
 
   const single = count === 1;
+  const reasoningModel = /gpt-oss|qwen|deepseek/i.test(GROQ_MODEL);
 
   // Kept short deliberately: every token here is read before generation
   // starts, so a long preamble costs latency on every single reply.
@@ -184,21 +209,47 @@ async function suggestReply(req, res) {
       { role: 'user', content: postText }
     ],
     temperature: 0.8,
-    max_tokens: Math.min(1200, 120 + count * maxWords * 4)
+    // A reasoning model spends tokens thinking before it writes anything, and
+    // that spend is unrelated to the reply length. Budgeting only for the
+    // reply, as this did, left nothing for the answer at short word limits:
+    // the thinking consumed everything and content came back empty.
+    max_tokens: reasoningModel
+      ? Math.min(2000, 800 + count * maxWords * 4)
+      : Math.min(1200, 120 + count * maxWords * 4)
   };
 
-  // gpt-oss models reason before answering. Left at the default effort they
-  // are slow, and the reasoning can consume the whole token budget and leave
-  // message.content empty - which is what surfaced as a reply that returned
-  // nothing. Low effort keeps them brief and quick.
-  if (GROQ_MODEL.indexOf('gpt-oss') !== -1) {
+  if (reasoningModel) {
+    // Low effort keeps these models quick, and hidden keeps the scratchpad
+    // out of the response entirely. Either is dropped if the model rejects
+    // it, rather than failing the request.
     payload.reasoning_effort = 'low';
+    payload.reasoning_format = 'hidden';
   }
 
   const startedAt = Date.now();
 
   try {
     let result = await generateSuggestions(payload, count);
+
+    // Empty output, or output that was all scratchpad, means the thinking ran
+    // out of room. Give it more and say plainly not to show its working.
+    if (result.suggestions.length === 0) {
+      result = await generateSuggestions(
+        Object.assign({}, payload, {
+          max_tokens: Math.min(2600, payload.max_tokens + 800),
+          messages: payload.messages.concat([
+            {
+              role: 'user',
+              content:
+                'Output only the final reply text. Do not show drafts, word ' +
+                'counts or any working out.'
+            }
+          ])
+        }),
+        count
+      );
+    }
+
     let hit = firstBannedTerm(result.suggestions, banned);
     let regenerated = false;
 
@@ -237,7 +288,7 @@ async function suggestReply(req, res) {
     if (result.suggestions.length === 0) {
       return res.status(502).json({
         error: 'The model returned nothing usable',
-        hint: 'A reasoning model may have spent its token budget thinking. Try a smaller model via GROQ_MODEL.',
+        hint: 'The model produced only working out, or nothing at all. Try another id from /api/models via GROQ_MODEL.',
         raw: result.content.slice(0, 200),
         finishReason: result.finishReason
       });
