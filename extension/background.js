@@ -31,6 +31,8 @@ async function generateReply(postText, settings) {
       tone: (settings && settings.tone) || 'natural',
       maxWords: (settings && settings.maxWords) || 40,
       bannedWords: (settings && settings.bannedWords) || '',
+      apiKey: (settings && settings.apiKey) || '',
+      model: (settings && settings.model) || '',
       count: 1
     })
   });

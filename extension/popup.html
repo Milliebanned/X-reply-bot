@@ -64,6 +64,16 @@
         <label for="bannedWords">Banned words and phrases</label>
         <textarea id="bannedWords" rows="2" placeholder="sounds, absolutely, great point"></textarea>
       </div>
+      <div class="settings-row">
+        <div class="input-group">
+          <label for="apiKey">Your Groq API key (optional)</label>
+          <input type="password" id="apiKey" placeholder="gsk_... leave empty to use the shared one">
+        </div>
+      </div>
+      <div class="input-group">
+        <label for="model">Model (optional)</label>
+        <input type="text" id="model" placeholder="openai/gpt-oss-20b">
+      </div>
       <div class="saved-hint" id="savedHint">Settings are saved automatically</div>
       <button id="generateBtn">Generate Reply Options</button>
     </div>

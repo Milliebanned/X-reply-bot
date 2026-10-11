@@ -4,7 +4,9 @@
 const SETTINGS_DEFAULTS = {
   tone: '',
   maxWords: 40,
-  bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve'
+  bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve',
+  apiKey: '',
+  model: ''
 };
 
 // Pulls just the post body, skipping the author, timestamp and counters that

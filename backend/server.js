@@ -17,6 +17,20 @@ const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODEL = (process.env.GROQ_MODEL || '').trim() || 'openai/gpt-oss-20b';
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 
+// A caller may bring their own key and model, so each person draws on their
+// own Groq quota rather than sharing one rate limit. The server's own key is
+// the fallback, which keeps the extension working before anyone sets one.
+// Keys are read per request and never logged or echoed back.
+function resolveKey(req) {
+  const supplied = req.body && req.body.apiKey;
+  return String(supplied || '').trim() || GROQ_API_KEY;
+}
+
+function resolveModel(req) {
+  const supplied = req.body && req.body.model;
+  return String(supplied || '').trim() || GROQ_MODEL;
+}
+
 function health(req, res) {
   res.json({
     status: 'ok',
@@ -33,13 +47,19 @@ app.get('/api/health', health);
 // Lists the models this API key can actually call, so a rejected model id
 // can be replaced with a real one instead of guessed at.
 async function listModels(req, res) {
-  if (!GROQ_API_KEY) {
-    return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server' });
+  // POST so a caller's own key travels in the body; a key in a query string
+  // would end up in request logs.
+  const apiKey = resolveKey(req);
+
+  if (!apiKey) {
+    return res.status(500).json({
+      error: 'No Groq API key. Add your own in the extension, or set GROQ_API_KEY on the server.'
+    });
   }
 
   try {
     const response = await axios.get(GROQ_BASE_URL + '/models', {
-      headers: { Authorization: 'Bearer ' + GROQ_API_KEY },
+      headers: { Authorization: 'Bearer ' + apiKey },
       timeout: 20000
     });
 
@@ -47,7 +67,7 @@ async function listModels(req, res) {
       .map(function (model) { return model.id; })
       .sort();
 
-    res.json({ current: GROQ_MODEL, available: available });
+    res.json({ current: resolveModel(req), available: available });
   } catch (error) {
     const status = error.response && error.response.status ? error.response.status : 500;
     const groqMessage =
@@ -62,6 +82,8 @@ async function listModels(req, res) {
 
 app.get('/api/models', listModels);
 app.get('/models', listModels);
+app.post('/api/models', listModels);
+app.post('/models', listModels);
 
 // X hard-caps a post at 280 characters, so anything much past 60 words is
 // unusable regardless of what the client asks for.
@@ -131,11 +153,11 @@ function looksLikeReasoning(text) {
   return REASONING_MARKERS.some(function (pattern) { return pattern.test(text); });
 }
 
-async function generateSuggestions(payload, count) {
+async function generateSuggestions(payload, count, apiKey) {
   let response;
 
   try {
-    response = await callGroq(payload);
+    response = await callGroq(payload, apiKey);
   } catch (error) {
     // Retry without the tuning parameter if this model rejects it, rather
     // than failing the request outright.
@@ -143,7 +165,7 @@ async function generateSuggestions(payload, count) {
       const retry = Object.assign({}, payload);
       delete retry.reasoning_effort;
       delete retry.reasoning_format;
-      response = await callGroq(retry);
+      response = await callGroq(retry, apiKey);
     } else {
       throw error;
     }
@@ -169,17 +191,21 @@ async function suggestReply(req, res) {
   const { postText, tone = 'natural', count = 2 } = req.body || {};
   const maxWords = clampMaxWords(req.body && req.body.maxWords);
   const banned = parseBannedWords(req.body && req.body.bannedWords);
+  const apiKey = resolveKey(req);
+  const model = resolveModel(req);
 
   if (!postText) {
     return res.status(400).json({ error: 'postText is required' });
   }
 
-  if (!GROQ_API_KEY) {
-    return res.status(500).json({ error: 'GROQ_API_KEY is not configured on the server' });
+  if (!apiKey) {
+    return res.status(500).json({
+      error: 'No Groq API key. Add your own in the extension, or set GROQ_API_KEY on the server.'
+    });
   }
 
   const single = count === 1;
-  const reasoningModel = /gpt-oss|qwen|deepseek/i.test(GROQ_MODEL);
+  const reasoningModel = /gpt-oss|qwen|deepseek/i.test(model);
 
   // Kept short deliberately: every token here is read before generation
   // starts, so a long preamble costs latency on every single reply.
@@ -203,7 +229,7 @@ async function suggestReply(req, res) {
   );
 
   const payload = {
-    model: GROQ_MODEL,
+    model: model,
     messages: [
       { role: 'system', content: rules.join('\n') },
       { role: 'user', content: postText }
@@ -229,7 +255,7 @@ async function suggestReply(req, res) {
   const startedAt = Date.now();
 
   try {
-    let result = await generateSuggestions(payload, count);
+    let result = await generateSuggestions(payload, count, apiKey);
 
     // Empty output, or output that was all scratchpad, means the thinking ran
     // out of room. Give it more and say plainly not to show its working.
@@ -246,7 +272,8 @@ async function suggestReply(req, res) {
             }
           ])
         }),
-        count
+        count,
+        apiKey
       );
     }
 
@@ -269,7 +296,7 @@ async function suggestReply(req, res) {
         ])
       });
 
-      const second = await generateSuggestions(secondPayload, count);
+      const second = await generateSuggestions(secondPayload, count, apiKey);
 
       if (second.suggestions.length > 0) {
         regenerated = true;
@@ -296,7 +323,7 @@ async function suggestReply(req, res) {
 
     res.json({
       suggestions: result.suggestions,
-      model: GROQ_MODEL,
+      model: model,
       tone,
       maxWords,
       banned: banned.length,
@@ -325,10 +352,10 @@ async function suggestReply(req, res) {
   }
 }
 
-function callGroq(payload) {
+function callGroq(payload, apiKey) {
   return axios.post(GROQ_BASE_URL + '/chat/completions', payload, {
     headers: {
-      Authorization: 'Bearer ' + GROQ_API_KEY,
+      Authorization: 'Bearer ' + apiKey,
       'Content-Type': 'application/json'
     },
     timeout: 20000

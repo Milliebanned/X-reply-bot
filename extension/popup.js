@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const maxWordsEl = document.getElementById('maxWords');
   const bannedWordsEl = document.getElementById('bannedWords');
   const savedHintEl = document.getElementById('savedHint');
+  const apiKeyEl = document.getElementById('apiKey');
+  const modelEl = document.getElementById('model');
 
   // Persisted so the tone and length do not have to be re-entered on every
   // reply. Kept in extension storage, which survives popup closes and
@@ -19,7 +21,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     maxWords: 40,
     // A starter list of the phrases that most read as bot-written. Edit
     // or clear it; whatever is here is what gets banned.
-    bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve'
+    bannedWords: 'sounds, absolutely, great point, love this, so true, game-changer, delve',
+    // Supplying a key means this install draws on its own Groq quota
+    // instead of sharing one rate limit with everyone else.
+    apiKey: '',
+    model: ''
   };
   let saveTimer = null;
 
@@ -27,6 +33,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   toneEl.addEventListener('input', scheduleSave);
   maxWordsEl.addEventListener('input', scheduleSave);
   bannedWordsEl.addEventListener('input', scheduleSave);
+  apiKeyEl.addEventListener('input', scheduleSave);
+  modelEl.addEventListener('input', scheduleSave);
 
   async function restoreSettings() {
     const stored = await chrome.storage.local.get('settings');
@@ -34,6 +42,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     toneEl.value = settings.tone;
     maxWordsEl.value = settings.maxWords;
     bannedWordsEl.value = settings.bannedWords;
+    apiKeyEl.value = settings.apiKey;
+    modelEl.value = settings.model;
   }
 
   // Debounced so typing a tone does not write on every keystroke.
@@ -47,7 +57,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       settings: {
         tone: toneEl.value.trim(),
         maxWords: readMaxWords(),
-        bannedWords: bannedWordsEl.value.trim()
+        bannedWords: bannedWordsEl.value.trim(),
+        apiKey: apiKeyEl.value.trim(),
+        model: modelEl.value.trim()
       }
     });
 
@@ -69,7 +81,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const health = await request('/api/health');
-    statusEl.textContent = 'Connected (' + health.model + ')';
+    statusEl.textContent = 'Connected (' + (modelEl.value.trim() || health.model) + ')';
     statusEl.classList.add('active');
     if (!health.keyConfigured) {
       showError('Server is up but GROQ_API_KEY is not set on it.');
@@ -131,6 +143,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           tone: toneEl.value.trim() || 'natural',
           maxWords: readMaxWords(),
           bannedWords: bannedWordsEl.value.trim(),
+          apiKey: apiKeyEl.value.trim(),
+          model: modelEl.value.trim(),
           count: 1
         })
       });

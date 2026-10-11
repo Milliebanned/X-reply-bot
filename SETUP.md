@@ -50,6 +50,41 @@ whatever you want, then send it yourself.
 Tone and max words are set in the extension popup and are saved
 automatically.
 
+## Giving it to someone else
+
+Groq rate limits are per API key, not per deployment, so the thing to give
+each person is their own key. They do not need their own backend.
+
+Have them:
+
+1. Install the extension as above
+2. Get a free key at https://console.groq.com (API Keys, Create New API Key)
+3. Paste it into **Your Groq API key** in the extension popup
+
+From then on their replies are generated against their own quota, and
+nothing they do eats into anyone else's. Leaving the field empty falls back
+to the shared key, so the extension still works before they set one up.
+
+The **Model** field is worth setting too. Which models a Groq account can
+serve differs between accounts, so a model that works for you may not exist
+for them. POST to `/api/models` with their key to see their own list:
+
+```bash
+curl -X POST https://xreply-six.vercel.app/api/models \
+  -H "Content-Type: application/json" \
+  -d '{"apiKey":"gsk_their_key_here"}'
+```
+
+Keys travel with each request and are never stored or logged by the
+backend. They do pass through it, so if someone would rather their key
+never leave their machine, they should deploy their own copy (see
+**Backend** above) and point `BACKEND_URL` in `extension/popup.js` and
+`extension/background.js` at it.
+
+A key in the extension is stored in that browser profile, so treat it like
+any other saved credential: it is fine for a free Groq key, less fine for a
+paid one on a shared computer.
+
 ## Backend
 
 The extension talks to a small Express service that holds the Groq key.
