@@ -3,6 +3,12 @@
 
 const BACKEND_URL = 'https://xreply-six.vercel.app';
 
+// Filled in by scripts/package-extension.js when building a copy to hand to
+// someone. Left empty here, so the repo never carries a real key. A key the
+// recipient enters in the popup takes precedence over this.
+const BAKED_API_KEY = '';
+const BAKED_MODEL = '';
+
 chrome.runtime.onInstalled.addListener(() => {
   console.log('X Reply Copilot extension installed');
 });
@@ -31,8 +37,8 @@ async function generateReply(postText, settings) {
       tone: (settings && settings.tone) || 'natural',
       maxWords: (settings && settings.maxWords) || 40,
       bannedWords: (settings && settings.bannedWords) || '',
-      apiKey: (settings && settings.apiKey) || '',
-      model: (settings && settings.model) || '',
+      apiKey: (settings && settings.apiKey) || BAKED_API_KEY,
+      model: (settings && settings.model) || BAKED_MODEL,
       count: 1
     })
   });

@@ -1,5 +1,9 @@
 const BACKEND_URL = 'https://xreply-six.vercel.app';
 
+// See background.js: filled in when packaging a copy for someone else.
+const BAKED_API_KEY = '';
+const BAKED_MODEL = '';
+
 document.addEventListener('DOMContentLoaded', async () => {
   const statusEl = document.getElementById('status');
   const postTextEl = document.getElementById('postText');
@@ -43,6 +47,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     maxWordsEl.value = settings.maxWords;
     bannedWordsEl.value = settings.bannedWords;
     apiKeyEl.value = settings.apiKey;
+    if (!settings.apiKey && BAKED_API_KEY) {
+      apiKeyEl.placeholder = 'Using the key bundled with this copy';
+    }
     modelEl.value = settings.model;
   }
 
@@ -81,7 +88,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     const health = await request('/api/health');
-    statusEl.textContent = 'Connected (' + (modelEl.value.trim() || health.model) + ')';
+    statusEl.textContent =
+      'Connected (' + (modelEl.value.trim() || BAKED_MODEL || health.model) + ')';
     statusEl.classList.add('active');
     if (!health.keyConfigured) {
       showError('Server is up but GROQ_API_KEY is not set on it.');
@@ -143,8 +151,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           tone: toneEl.value.trim() || 'natural',
           maxWords: readMaxWords(),
           bannedWords: bannedWordsEl.value.trim(),
-          apiKey: apiKeyEl.value.trim(),
-          model: modelEl.value.trim(),
+          apiKey: apiKeyEl.value.trim() || BAKED_API_KEY,
+          model: modelEl.value.trim() || BAKED_MODEL,
           count: 1
         })
       });
