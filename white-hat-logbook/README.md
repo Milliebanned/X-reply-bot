@@ -7,7 +7,7 @@ It is one static page (`index.html`) with no build step:
 
 - **Landing page:** smoke hero, a wall of code scenes, a 3D hooded hacker that "hacks in" as you scroll, and an FAQ.
 - **Logbook** (`#logbook`): three tabs.
-  - **Today:** your current task, split into small numbered steps that each say where to do them (Chrome, Burp, Burp's browser, Terminal or notes), plus a timer.
+  - **Today:** your current task, split into small numbered steps that each say where to do them (Chrome, Burp, Burp's browser, Terminal or notes), plus a timer. Every step has a **Read more** with a detailed how-to, what you should see, and what to do if it doesn't work.
   - **Weeks:** each week unlocks only when the week before it is done, or after you mark it as done.
   - **Progress:** hours, streak, heatmap, adding time by hand, history and settings.
 

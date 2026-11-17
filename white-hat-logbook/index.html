@@ -731,6 +731,27 @@ details.guide > summary{padding:14px 22px}
   .mod.locked .mod-wk{grid-column:2;grid-row:1}.mod.locked .mod-t{grid-column:2;grid-row:2}.mod.locked .st{grid-row:1 / span 2}.mod.locked .mod-r{grid-row:1 / span 2;grid-column:3}
   .confirm-row{padding:14px 18px}
 }
+
+/* ===== Read more under every step ===== */
+details.more{margin-top:10px}
+details.more > summary{list-style:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);padding:4px 10px 4px 0;border-radius:8px;transition:color .2s}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary:hover{color:#fff}
+details.more > summary .chev{width:14px;height:14px;stroke:currentColor}
+details.more[open] > summary .chev{transform:rotate(180deg)}
+details.more .more-close{display:none}
+details.more[open] .more-open{display:none}
+details.more[open] .more-close{display:inline}
+.more-b{margin-top:8px;padding:14px 16px;border-radius:12px;background:#111111;border:1px solid var(--line);display:grid;gap:10px;animation:viewIn .35s var(--ease)}
+.more-h{font:500 11px var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.more-b ol{margin:0;padding-left:20px;display:grid;gap:7px;font-size:14.5px;line-height:1.55;color:#E6E6E6}
+.more-b li::marker{color:var(--muted);font-family:var(--f-mono);font-size:12px}
+.more-b b{color:#fff;font-weight:600}
+.more-b code{font:12.5px var(--f-mono);background:#000000;border:1px solid var(--line);padding:1px 6px;border-radius:6px;color:#fff;overflow-wrap:anywhere}
+.more-b a{color:#fff;text-decoration:underline;text-underline-offset:3px}
+.more-see,.more-fix{font-size:14px;color:var(--muted);padding-top:9px;border-top:1px dashed var(--line);margin:0}
+.more-all{display:flex;justify-content:flex-end;padding:0 28px 6px}
+@media (max-width:680px){ .more-all{padding:0 18px 6px} .more-b{padding:12px 13px} }
 </style>
 </head>
 <body>
@@ -954,7 +975,7 @@ details.guide > summary{padding:14px 22px}
         <div class="gi"><span class="where w-bb">Burp's browser</span><h4>Burp's own browser</h4><p>Opens from inside Burp: <b>Proxy → Open browser</b>. It's connected to Burp, so Burp can see its traffic. Normal Chrome isn't. Use it for every lab.</p></div>
       </div>
       <p class="rule">The one rule: <b>reading → Chrome</b>. <b>Hacking a lab → Burp's browser, with Burp open.</b></p>
-      <p class="muted" style="font-size:13.5px">Every step below has a label telling you where to do it. Tick each step as you finish it. When every step is ticked, the task is done and the next one appears.</p>
+      <p class="muted" style="font-size:13.5px">Every step below has a label telling you where to do it, and a <b>Read more</b> with a detailed how-to. Tick each step as you finish it. When every step is ticked, the task is done and the next one appears.</p>
     </div>
   </details>
     <section class="focus glass" id="focus" aria-label="Today's task"></section>
@@ -1353,7 +1374,7 @@ var STEPS = {
 };
 var TPL = {
   lesson:[
-    ["log","Press **Start the timer on this** below, so your time counts."],
+    ["log","Press **Start timer** at the top of this page, so your time counts."],
     ["chrome","Open the [{T} lesson]({U}) in Chrome. Log in to PortSwigger if it asks."],
     ["chrome","Read the opening section that explains **what {t} is**. Then say it out loud in one sentence, as if you were telling a friend."],
     ["notes","Start a new note called **{T}** and write that one sentence."],
@@ -1386,7 +1407,7 @@ var TPL = {
     ["notes","After each lab, write which bug it was and the first clue that gave it away."],
     ["tip","Do 4 labs for this task, about 2 a week."]],
   generic:[
-    ["log","Press **Start the timer on this** below."],
+    ["log","Press **Start timer** at the top of this page."],
     ["chrome","Open the [link]({U}) in Chrome."],
     ["chrome","Work through it slowly. Skip what doesn't make sense yet."],
     ["notes","Write 3 things you learned, in your own words."]]
@@ -1414,6 +1435,248 @@ function md(str){
   h = h.replace(/`([^`]+)`/g, '<code>$1</code>');
   h = h.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
   return h;
+}
+
+/* ================= Read more: a detailed how-to for every step ================= */
+/* Each entry lines up with the task's steps: {how:[...], see:"...", fix:"..."} */
+var MORE = {
+  "s-acct":[
+    {how:["Open Chrome, type `portswigger.net/web-security` in the address bar and press Enter.", "Look at the top-right corner of the page for **Sign up**. On some pages it's behind **Login**, with a sign-up link underneath.", "Click it. A form opens asking for your email address."], see:"A sign-up form with a box for your email.", fix:"Can't see the button? Make the window wider. On narrow windows the menu folds into a ☰ icon."},
+    {how:["Type an email address you can open right now.", "Accept the terms if there's a tick box, then submit the form.", "Open your inbox and find the email from PortSwigger. Check Spam and Promotions if it isn't there after 5 minutes.", "Click the link in the email and choose a password.", "Use a password you don't use anywhere else, and save it somewhere safe."], see:"A page saying your account is ready, or you're logged in.", fix:"No email after 10 minutes? Check the spelling of your address and request it again."},
+    {how:["Go back to `portswigger.net/web-security`.", "Click **Login** and enter your email and password.", "Open any topic, for example SQL injection, to check you can see the lessons."], see:"Your account name or a profile icon in the top-right corner.", fix:"Forgot your password? Use the **Forgot password** link on the login page."}
+  ],
+  "s-burp":[
+    {how:["Click the link to open the download page.", "Choose **Burp Suite Community Edition**, the free one. Not Professional.", "Choose your system. On a Mac, pick **Apple Silicon** for M1, M2, M3 or newer, or **Intel** for older Macs. On Windows, pick Windows.", "Click **Download**. It's a large file, so give it a few minutes."], see:"A file ending in `.dmg` (Mac) or `.exe` (Windows) in your Downloads folder.", fix:"Not sure which Mac you have? Apple menu → **About This Mac**. \"Chip: Apple M…\" means Apple Silicon."},
+    {how:["**Mac:** double-click the `.dmg` file and follow the installer, or drag Burp Suite into Applications.", "**Windows:** double-click the `.exe` file and click **Next** through the installer, keeping the default options.", "If your computer asks for permission, enter your computer password or click **Yes**."], see:"Burp Suite Community Edition in Applications (Mac) or the Start menu (Windows).", fix:"Mac says the app can't be opened? Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**."},
+    {how:["Open Burp Suite. The first start can take 20–30 seconds.", "Accept the licence agreement if it asks.", "On the first screen keep **Temporary project in memory** selected and click **Next**.", "On the next screen keep **Use Burp defaults** and click **Start Burp**."], see:"Burp's main window with tabs across the top.", fix:"A box says \"Project files are Burp Suite Professional only\"? That's normal for the free version. Just use Temporary project."},
+    {how:["**Dashboard:** status messages. Ignore it for now.", "**Proxy:** captures everything Burp's browser sends. You'll use it in every lab.", "**Repeater:** lets you change a captured request and send it again. You'll use it in almost every lab.", "The other tabs (Intruder, Decoder, Comparer and so on) come later, when a lesson needs them."], see:"Tabs including Dashboard, Target, Proxy, Intruder and Repeater."}
+  ],
+  "s-guide":[
+    {how:["Open the Burp Suite app.", "Keep **Temporary project in memory** and click **Next**.", "Keep **Use Burp defaults** and click **Start Burp**."], see:"Burp's main window."},
+    {how:["Click the link. It opens PortSwigger's own beginner guide.", "**Mac:** drag Chrome to the left half of the screen and Burp to the right, or hover over the green button in a window's corner and choose to tile it.", "**Windows:** click Chrome and press **Windows key + ←**, then pick Burp for the other half."], see:"The guide on one side of your screen and Burp on the other."},
+    {how:["Read one section of the guide.", "Before moving on, do exactly what that section describes, in Burp.", "If your screen looks a little different from the guide's pictures, look for the same words. Burp's layout changes slightly between versions.", "Only move to the next page when the current one worked."], fix:"Stuck on one page for more than 15 minutes? Skip it, finish the rest, then come back to it."},
+    {how:["In Burp, click the **Proxy** tab.", "Click **Open browser**. A new browser window opens. That's Burp's browser.", "**Mac, first time only:** if macOS asks for your login password for \"Chromium Safe Storage\", type your Mac password and click **Always Allow**."], see:"A new browser window that looks like Chrome.", fix:"Nothing seems to happen? The window may be behind Burp. Check your Dock or taskbar."},
+    {how:["In Burp, go to **Proxy → Intercept**.", "Click the button that says **Intercept off**. It changes to **Intercept on**.", "Switch to Burp's browser and click any link, or type `example.com` in the address bar and press Enter.", "The page keeps loading. That's expected: Burp is holding the request."], see:"The held request in Burp: a first line starting with `GET`, then lines like `Host:` and `User-Agent:`."},
+    {how:["Look at the first line: the method (`GET`) and the page being asked for.", "Find the `Host:` line. That's the website.", "Click **Forward**. The page loads in the browser. If more requests appear, keep clicking **Forward**.", "Click **Intercept on** to switch it back to **Intercept off**."], see:"Pages load normally again in Burp's browser.", fix:"Pages still stuck? Intercept is still on. Check the button says **Intercept off**."},
+    {how:["Open your notes app and your **Web security** folder.", "Write the line, in your own words if you prefer.", "Add one more line: the thing that surprised you most in the guide."]}
+  ],
+  "s-repeater":[
+    {how:["Start Burp: **Temporary project → Next → Use Burp defaults → Start Burp**.", "Click the **Proxy** tab.", "Check the button says **Intercept off**, then click **Open browser**."], see:"Burp's browser opens."},
+    {how:["In **Burp's browser** (not your normal Chrome), go to `portswigger.net` and log in.", "Open the [SQL injection](https://portswigger.net/web-security/sql-injection) topic, or any other topic.", "Scroll to the list of labs at the bottom and click the first one.", "Click **Access the lab**. A practice shop opens in a new tab. It's a fake website made for you to attack."], see:"A shop website with products, with the lab's title in a banner at the top."},
+    {how:["Click **View details** on any product.", "Look at the address bar. It should end with something like `/product?productId=1`.", "The `productId=1` part is a **parameter**: a value your browser sends to the website. Labs are mostly about changing values like this."]},
+    {how:["Switch to the Burp window.", "Click **Proxy**, then the **HTTP history** sub-tab.", "You'll see every request the browser sent, newest at the bottom.", "Find the row whose URL contains `productId` and click it once."], see:"The full request in the panel below, starting with `GET /product?productId=1`.", fix:"Is the list empty? You probably used normal Chrome. Use Burp's browser (**Proxy → Open browser**)."},
+    {how:["Right-click the highlighted row. On a Mac trackpad, click with two fingers.", "Choose **Send to Repeater**.", "Click the **Repeater** tab at the top. Your request is there in a tab numbered 1."]},
+    {how:["In the left panel (Request), click just after `productId=` and change `1` to `2`.", "Click **Send**.", "Look at the right panel (Response). Scroll down, or click **Render** to see it as a page."], see:"A different product's name and description in the response."},
+    {how:["Change the value to `abc` and click **Send**.", "Read the first line of the response, the status code. Is it 200, 400 or 500?", "Look for any error message in the response.", "Try a few more: an empty value, a huge number like `999999`, a single quote `'`."], see:"Different responses for different input. Errors are a clue that a site doesn't handle input safely."},
+    {how:["Write the sentence in your notes.", "Add which odd value gave the most interesting response, and its status code."]}
+  ],
+  "s-http":[
+    {how:["Click the link. It opens MDN, Mozilla's free guide to how the web works.", "Bookmark the page. You'll come back to it."]},
+    {how:["Think of a restaurant. You (the browser) hand the waiter an order (the **request**). The kitchen (the website's **server**) sends back a dish (the **response**).", "Every page, picture and button click on the web is one of these request-and-response pairs.", "Burp lets you read and rewrite the order before it reaches the kitchen."]},
+    {how:["Find the heading about the **components of HTTP-based systems**.", "Read about the **client** (also called the user-agent), the **web server** and **proxies**.", "Skip the parts about caching and load balancing on this first read."]},
+    {how:["Write the sentence in your notes.", "Draw it if that helps: **browser → Burp → website**."]},
+    {how:["Find the part titled **HTTP is stateless, but not sessionless**.", "Stateless means each request arrives on its own. The website doesn't remember your previous one.", "Cookies fix that. After you log in, the website gives your browser a cookie, and the browser sends it back with every request."]},
+    {how:["Write the sentence in your notes.", "Add: \"A cookie is sent in a header called `Cookie:`.\" You'll see that header in Burp."]},
+    {how:["Find the section about what can be controlled by HTTP.", "Read only the headings: caching, authentication, sessions and so on.", "Each heading is a future topic. Don't try to learn them now."]},
+    {how:["Read **HTTP flow** first. It lists the steps of one request.", "Then read **HTTP Messages**. It shows a real request and a real response.", "Compare MDN's example with the one below this step. Find the method, the path, the `Host:` line and the `Cookie:` line.", "Read it twice. It's the most important part of this week."]},
+    {how:["Write each status code with its meaning.", "Write **GET** = give me something, **POST** = here's some data (like a login form).", "Bonus: **401** means \"log in first\"."]},
+    {how:["Open any website in Chrome.", "Press `Cmd + Option + I` (Mac) or `F12` (Windows). A panel opens.", "Click the **Network** tab in that panel.", "Reload the page with `Cmd + R` or `F5`. A list of requests fills in.", "Click the first one, then **Headers**. Find **Request Method**, **Status Code** and **Request Headers**."], see:"Usually **Request Method: GET** and **Status Code: 200**.", fix:"Empty list? Keep the panel open and reload again. The Network tab only records while it's open."},
+    {how:["Close MDN and answer the five questions from memory, in your notes.", "Then check them against what you wrote today.", "Any you got wrong: re-read just that part of the page."]}
+  ],
+  "s-notes":[
+    {how:["Use something you already have: Apple Notes, Google Keep, Notion or Obsidian.", "Pick one that works on both your phone and your computer, so your notes are always with you."]},
+    {how:["**Apple Notes:** click **New Folder** at the bottom left and call it Web security.", "**Google Keep:** create a label called Web security.", "**Notion or Obsidian:** create a page or folder called Web security."]},
+    {how:["Create a note called **Lab write-ups**.", "Use this format for each lab: **Lab name**, **What I changed**, **Why it worked**.", "Two lines per lab is plenty."]}
+  ],
+  "f-sql":[
+    {how:["Click the link. SQLBolt runs in your browser, so there's nothing to install.", "Click **Lesson 1**.", "The idea: a database is like a set of spreadsheets, and SQL is how you ask it for rows."]},
+    {how:["Read the short text at the top of the lesson.", "Look at the example query in the grey box and match each word to its explanation."]},
+    {how:["Below the text there's a table of data and a box where you type a query.", "Read the first task, type your query and watch the results change.", "When your query is right, the task turns green and the next one unlocks."]},
+    {how:["Stuck? Re-read the lesson's example and change it a little.", "Only after two honest tries, click **Solution**, read it, then type it in yourself."]},
+    {how:["Keep a mini cheat sheet: `SELECT` (which columns), `FROM` (which table), `WHERE` (which rows), `ORDER BY` (sorting), `JOIN` (combining tables).", "Write one real example next to each."]},
+    {how:["Session 1: lessons 1–4. Session 2: lessons 5–8. Session 3: lessons 9–12.", "Start each session by redoing the last task from the session before."]},
+    {how:["Write it in your own words, for example: \"WHERE decides which rows come back.\"", "Next week you'll see that SQL injection works by changing what WHERE checks."]}
+  ],
+  "f-union":[
+    {how:["Click the link to open W3Schools' page about `UNION`."]},
+    {how:["Read the explanation and the example.", "Click **Try it Yourself**. An editor opens with the query in it.", "Click **Run SQL** and look at the results.", "Change something, for example remove one column from one side, and run it again. Read the error you get."], see:"Two lists of results stacked into one table."},
+    {how:["`UNION` stacks the results of two `SELECT` queries into one table.", "Attackers add `UNION SELECT ...` to a website's own query to pull data from other tables, such as usernames and passwords."]},
+    {how:["Write the sentence in your notes.", "Add the error you saw when the column counts didn't match. You'll see that same kind of error in the labs."]}
+  ],
+  "m-cookies":[
+    {how:["Click the link to open MDN's page about cookies."]},
+    {how:["Read the part about **creating cookies**: the website sends a `Set-Cookie` header in its response.", "From then on, the browser sends a `Cookie` header back with every request to that website.", "Skim the rest of the page."]},
+    {how:["**Secure:** the cookie is only sent over HTTPS.", "**HttpOnly:** JavaScript on the page can't read the cookie. This protects it from XSS attacks.", "**SameSite:** limits sending the cookie when another website triggers the request. This protects against CSRF."]},
+    {how:["Write the sentence in your notes.", "Open Chrome DevTools (`Cmd + Option + I` or `F12`), go to **Application → Cookies**, and look at the cookies of a site you're logged in to."], see:"A table of cookie names and values, with columns for Secure, HttpOnly and SameSite."}
+  ],
+  "f-linux":[
+    {how:["**Mac:** press `Cmd + Space`, type **Terminal** and press Enter.", "**Windows:** open PowerShell as administrator, run `wsl --install`, restart your computer, then open **Ubuntu** from the Start menu.", "Type `pwd` and press Enter. It prints the folder you're in."], see:"A line like `/Users/yourname` or `/home/yourname`."},
+    {how:["Click the link and open the **Command Line** section.", "Each lesson is short. Read it, then try it in Terminal."]},
+    {how:["`pwd` shows where you are. `ls` lists files. `cd folder` moves into a folder. `cd ..` goes back up.", "`mkdir test` makes a folder. `touch note.txt` makes a file. `cat note.txt` prints a file.", "Type each one yourself and watch what happens."], fix:"\"command not found\" usually means a typo. Check spaces and spelling."},
+    {how:["`echo hello` prints text. `head` and `tail` show the start and end of a file.", "`grep word file` finds lines that contain a word.", "The pipe `|` sends one command's output into another, for example `cat notes.txt | grep cookie`."]},
+    {how:["List each command with one line about what it does.", "Put a star next to `cat`, `ls` and `whoami`. Next week you'll make a website run them."]}
+  ],
+  "f-bandit":[
+    {how:["Open the Bandit page and click **Level 0**.", "Read the goal: log in to the game's server using SSH."]},
+    {how:["Open Terminal.", "Type the command exactly and press Enter.", "If it asks \"Are you sure you want to continue connecting?\", type `yes`.", "Type the password `bandit0`. Nothing appears while you type a password. That's normal."], see:"A welcome message and a prompt like `bandit0@bandit:~$`."},
+    {how:["Each level's page tells you where the next password is hidden.", "Use `ls`, `cat` and `cd`, plus the \"Commands you may need\" list on the level page.", "Type `exit` to log out, then SSH in again as the next user (`bandit1` and so on) with the password you found."]},
+    {how:["Copy each password into your notes as soon as you find it.", "Label it with the level number."]},
+    {how:["Bandit is optional practice. Stop whenever it stops being fun.", "Coming back to it later is a good way to keep your Linux skills sharp."]}
+  ],
+  "f-js":[
+    {how:["Click the link to MDN's JavaScript first steps.", "Start with the first article, about what JavaScript is."]},
+    {how:["Mac: `Cmd + Option + J`. Windows: `Ctrl + Shift + J`.", "A **Console** panel opens. You can type JavaScript there and press Enter to run it.", "Chrome may block pasting and ask you to type \"allow pasting\". Typing the code yourself is better practice anyway."]},
+    {how:["Type `alert('hello')` and press Enter. A pop-up appears.", "Type `2 + 2`. The console prints 4.", "Try each example from the article the same way."]},
+    {how:["**Variables** store values: `let name = 'Sam'`.", "**Strings** are text in quotes.", "**Functions** are reusable blocks of code.", "Skip the maths-heavy exercises for now."]},
+    {how:["Write the sentence in your notes.", "This is the whole idea of XSS: getting a website to run your JavaScript in someone else's browser."]},
+    {how:["Session 1: the first two articles. Session 2: variables and maths. Session 3: strings. Session 4: arrays and a recap.", "Stop each session after about 2 hours."]}
+  ],
+  "m-sop":[
+    {how:["Click the link to MDN's same-origin policy page."]},
+    {how:["An **origin** is protocol + domain + port, for example `https://shop.com:443`.", "Change any one part and it's a different origin.", "Browsers stop a page from one origin reading data from another origin."]},
+    {how:["Write the sentence in your notes.", "This week's attacks each find a way around that rule."]}
+  ],
+  "rev-1":[
+    {how:["Open your **Lab write-ups** note.", "Pick the 3 labs that took you longest or needed the most hints."]},
+    {how:["Open Burp, then **Proxy → Open browser**.", "Find the first lab on PortSwigger and click **Access the lab** again. Labs can be redone as many times as you like."]},
+    {how:["Close the lesson, your notes and any AI chat.", "Start a timer and solve the lab from scratch."]},
+    {how:["Write the exact moment you got stuck, for example \"didn't know which request to send to Repeater\".", "Re-read only that part of the lesson."]},
+    {how:["Do the same for the other two labs.", "Done when you can solve all 3 without help."]}
+  ],
+  "rev-2":[
+    {how:["Open your write-ups and look for topics where you used hints or solutions.", "Pick 5 Practitioner labs from those topics."]},
+    {how:["Open each lab fresh in Burp's browser.", "No lesson, no AI and no solution while you work."]},
+    {how:["For each lab, write the first clue that showed you what the bug was, for example \"error message after adding a quote mark\"."]},
+    {how:["Any topic you still can't do alone: re-read its lesson now, before exam prep starts."]}
+  ],
+  "py-1":[
+    {how:["Go to python.org/downloads and click the big **Download Python** button.", "Run the installer. **Windows:** tick **Add python.exe to PATH** before clicking Install.", "Open Terminal and type `python3 --version`. On Windows type `python --version`."], see:"A version number like `Python 3.13.x`."},
+    {how:["Open the Python for Everybody lessons page.", "Start with chapter 1. Each chapter has videos and a book chapter. Choose whichever suits you, or use both."]},
+    {how:["In Terminal, type `python3` (Windows: `python`) and press Enter. The prompt changes to `>>>`.", "Type `print('hello')` and press Enter.", "Type `exit()` to leave.", "For longer programs, save them in a file like `hello.py` and run `python3 hello.py`."]},
+    {how:["Each chapter ends with exercises. Do them before moving on.", "If you get an error, read the last line of it first. It usually says what went wrong."]},
+    {how:["After each chapter, write the 2–3 new things you can now do, for example \"use if/else to make decisions\"."]}
+  ],
+  "py-8":[
+    {how:["Click the link to open the official requests quickstart guide."]},
+    {how:["In Terminal, run `python3 -m pip install requests`.", "Windows: `python -m pip install requests`."], see:"\"Successfully installed requests\" or \"Requirement already satisfied\"."},
+    {how:["Start Python with `python3`.", "Type `import requests`, then `r = requests.get('https://example.com')`, then `print(r.status_code)`.", "Try `print(r.text[:200])` to see the start of the page."], see:"`200`, and then some HTML."},
+    {how:["In the quickstart, read the parts about sending **cookies** (`cookies={...}`) and **form data** (`data={...}`).", "Try both against `https://httpbin.org/post`, which echoes back what you sent."]},
+    {how:["Write the sentence in your notes.", "Add one example of `requests.get` and one of `requests.post`."]}
+  ],
+  "py-9":[
+    {how:["Look through your write-ups for a lab where you sent lots of similar requests, for example guessing a password one letter at a time."]},
+    {how:["Open the lab again in Burp's browser.", "In **Proxy → HTTP history**, find the request you attacked.", "Copy its URL, its cookie and the value you changed into a text file."]},
+    {how:["Write a loop that tries each possible value with `requests` and checks the response.", "Start small: test with 3 values before trying hundreds."]},
+    {how:["Print each correct guess as you find it.", "Run it, then check the result by logging in or submitting it in the lab."]},
+    {how:["If you get an error, paste it into an AI chat and ask what it means.", "Ask it to explain, not to write the script for you."]}
+  ],
+  "c-hints":[
+    {how:["Click the link to PortSwigger's exam hints and guidance."]},
+    {how:["Find how many applications you must attack, how many stages each has, and how long you get.", "Note what counts as finishing each stage."]},
+    {how:["Write every rule and tip in a note called **Exam**.", "This week you'll turn them into a checklist."]}
+  ],
+  "c-sheet":[
+    {how:["Make one short page per topic.", "Under each, write: where the bug usually hides, the first thing to try, and one payload that worked for you."]},
+    {how:["Order the topics by what you'd test first in the exam, usually the most common bugs first."]},
+    {how:["Keep each page short enough to read in 30 seconds."]}
+  ],
+  "c-practice":[
+    {how:["Click the link to the practice exam page and read how to start it."]},
+    {how:["Block out 4 quiet hours, with your phone in another room.", "Open Burp and Burp's browser before you start."]},
+    {how:["Work through it like the real exam, using only your own checklists.", "No AI and no solutions."]},
+    {how:["When time's up, write which stage you reached and where you got stuck."]}
+  ],
+  "c-gaps":[
+    {how:["From your practice exam notes, list every topic where you were slow or unsure."]},
+    {how:["For each one, redo 2 Practitioner labs from that topic without help."]},
+    {how:["Add anything new you learned to your exam checklist."]}
+  ],
+  "c-pro":[
+    {how:["Click the link to the Burp Suite Professional page.", "Buy a licence. It's a yearly subscription. Start a trial if PortSwigger offers one.", "You'll get a licence key by email."]},
+    {how:["Download and install Burp Suite Professional the same way as Community.", "Open it and click **Enter license key**. Paste your key.", "To test Collaborator, open the **Collaborator** tab, copy the address it gives you, open it in Burp's browser, then click **Poll now**."], see:"An interaction listed in the Collaborator tab."}
+  ],
+  "c-exam":[
+    {how:["Click the link to the certification page and buy the exam.", "Read any setup instructions in the confirmation email."]},
+    {how:["Pick a day and time when you're rested.", "You need 4 hours without interruptions."]},
+    {how:["Before starting: Burp Pro open, your checklists open, water and a snack nearby."]},
+    {how:["Go one stage at a time.", "If you're stuck for 30 minutes, move to the other application and come back later.", "Keep notes as you go, so you don't repeat tests."]}
+  ],
+  "c-expert":[
+    {how:["Open the all-labs page and filter or scroll to labs marked **Expert**.", "Pick 3 from topics you enjoyed."]},
+    {how:["Expert labs often combine several bugs. Plan before you start clicking.", "Use the AI hint prompt freely here."]},
+    {how:["Write each one up properly: the goal, the steps and why it worked.", "These make great examples to talk about in job interviews."]}
+  ]
+};
+var TPL_MORE = {
+  lesson:[
+    {how:["Look at the top of the **Today** tab, next to the week title.", "Press **Start timer**. It records this session against the current week.", "Press **Finish** when you stop. Your hours and streak update automatically."]},
+    {how:["Click the link. It opens the {T} lesson on PortSwigger.", "Log in if PortSwigger asks.", "Normal Chrome is fine for reading. You only need Burp's browser for labs."]},
+    {how:["Read until the first big heading.", "Explain {t} to yourself in one sentence, starting with \"It's when…\".", "If you can't, read the opening again."]},
+    {how:["Open your notes app and your Web security folder.", "Create a note called **{T}** and write your one sentence at the top."]},
+    {how:["Read each section in order. Most sections explain one kind of {t}.", "If a section confuses you, write down its name and move on. The matching lab usually makes it clear."]},
+    {how:["Find each grey example box.", "Compare it with what a normal visitor would send.", "Spot the exact part the attacker changed, and why the website trusted it."]},
+    {how:["**How to spot it:** where on a website this bug usually hides.", "**How to exploit it:** what you change in the request.", "**How to stop it:** the fix the lesson recommends, usually near the end."]},
+    {how:["Press **Copy an AI hint prompt** at the bottom of this card.", "Paste it into any AI chat, such as Claude or ChatGPT, and add your question.", "Ask for explanations, not answers."]}
+  ],
+  labs:[
+    {how:["Open the Burp Suite app.", "Choose **Temporary project in memory → Next → Use Burp defaults → Start Burp**."], see:"Burp's main window."},
+    {how:["Click the **Proxy** tab.", "If the button says **Intercept on**, click it so it says **Intercept off**.", "Click **Open browser**. Use only this browser for the lab."], fix:"Using normal Chrome by mistake? Burp won't see anything. Close it and use Burp's browser."},
+    {how:["In Burp's browser, open the lesson link and log in to PortSwigger.", "Scroll to the bottom. Each lab is tagged APPRENTICE, PRACTITIONER or EXPERT.", "Pick the first lab marked **{L}** that isn't solved yet."]},
+    {how:["Read the whole description slowly.", "Copy the sentence starting \"To solve the lab\" into your notes.", "Also note any login details it gives you, like a username and password."]},
+    {how:["Click **Access the lab**. A practice website opens in a new tab.", "Use it like a normal visitor for a minute: browse, search, log in if it gave you details.", "Every click becomes a request in Burp."]},
+    {how:["Switch to Burp, then **Proxy → HTTP history**.", "Find the request that matches your goal: a category filter, a login, a product ID or a file name.", "Click it and read the request underneath. Which values could you change?"], fix:"Can't find it? Click the **#** column heading to sort by order, then repeat the action in the browser and look at the newest rows."},
+    {how:["Right-click the request, choose **Send to Repeater**, then open the **Repeater** tab.", "Change one value, click **Send**, and read the response.", "Try the technique the lesson describes for this kind of lab.", "Keep a note of what you've tried."], see:"When you've done it, the lab page shows a **Solved** banner. Refresh the lab tab to check."},
+    {how:["Give yourself 30 minutes per lab.", "Re-read the part of the lesson that matches this lab.", "Press **Copy an AI hint prompt** and ask for one hint.", "Still stuck? Open the lab's official solution on PortSwigger, read it, close it, then solve the lab yourself."]},
+    {how:["Open your **Lab write-ups** note.", "Write the lab's name, what you changed, and why it worked."]},
+    {how:["Go back to the lesson page and pick the next lab marked **{L}**.", "Repeat steps 3–9 for it.", "When every **{L}** lab on the page is solved, tick this step and the task is done."]}
+  ],
+  py:[
+    {how:["Click the link to the Python for Everybody lessons.", "Find {C} in the list."]},
+    {how:["Each chapter has short videos and a book chapter.", "Use whichever you prefer. Many people watch the video, then skim the chapter."]},
+    {how:["In Terminal, type `python3` (Windows: `python`) to get the `>>>` prompt.", "Type each example from the chapter yourself and run it.", "For longer code, save it in a `.py` file and run it with `python3 file.py`."]},
+    {how:["Do the exercises at the end of each chapter before moving on.", "If you get an error, read its last line first. It usually says what's wrong."]},
+    {how:["Write the 2–3 new things you can now do, for example \"read a file line by line\"."]}
+  ],
+  mystery:[
+    {how:["Click the link to PortSwigger's mystery lab challenge page."]},
+    {how:["In Burp's browser, choose **Practitioner** as the level and start a mystery lab.", "PortSwigger picks a random lab and hides its title, so you don't know the bug in advance."]},
+    {how:["Click through every page, form and button.", "In **Proxy → HTTP history**, list every parameter, cookie and form field you see."]},
+    {how:["Go through your topic notes one by one.", "For each input, try the first test from each topic in Repeater until something reacts: an error, a delay or a different response."]},
+    {how:["Write which bug it was, and the first clue that gave it away."]},
+    {how:["Do 4 mystery labs for this task, about 2 a week.", "Tick this step when you've solved all 4."]}
+  ],
+  generic:[
+    {how:["Look at the top of the **Today** tab and press **Start timer**.", "Press **Finish** when you stop."]},
+    {how:["Click the link. It opens in Chrome."]},
+    {how:["Go slowly. If something doesn't make sense, write it down and keep going.", "Come back to the confusing parts at the end."]},
+    {how:["Write 3 things you learned, in your own words."]}
+  ]
+};
+function fillMore(arr, map){
+  var f = function(s){ return s == null ? s : String(s).replace(/\{(\w)\}/g, function(_, k){ return map[k] != null ? map[k] : ""; }); };
+  return arr.map(function(o){ return o ? {how:(o.how || []).map(f), see:f(o.see), fix:f(o.fix)} : null; });
+}
+var MORE_CACHE = {};
+function moreFor(t){
+  if (MORE_CACHE[t.id]) return MORE_CACHE[t.id];
+  var out, x = t.topic && T[t.topic];
+  if (MORE[t.id]) out = MORE[t.id];
+  else if (/-L$/.test(t.id) && x) out = fillMore(TPL_MORE.lesson, {T:x[0], t:x[1]});
+  else if (/-(A|P)$/.test(t.id) && x){ var lv = /-A$/.test(t.id) ? "Apprentice" : (/Practitioner/.test(t.t) ? "Practitioner" : "Apprentice (then Practitioner)"); out = fillMore(TPL_MORE.labs, {L:lv}); }
+  else if (/^py-/.test(t.id)) out = fillMore(TPL_MORE.py, {C:(t.t.split(", ")[1] || "the next chapter")});
+  else if (/^c-m\d$/.test(t.id)) out = TPL_MORE.mystery;
+  else out = TPL_MORE.generic;
+  MORE_CACHE[t.id] = out; return out;
+}
+var MORE_FALLBACK = {how:["Read the step above one sentence at a time.", "Do exactly what it says, in the place its label shows (for example CHROME or BURP APP).", "Still unsure? Press **Copy an AI hint prompt** and ask an AI to explain this step."]};
+var openMore = {};
+function moreHtml(t, i){
+  var m = moreFor(t)[i] || MORE_FALLBACK, id = "mo-" + t.id + "-" + i;
+  var h = '<details class="more" id="' + id + '"' + (openMore[id] ? ' open' : '') + '><summary><span class="more-open">Read more</span><span class="more-close">Show less</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary><div class="more-b">';
+  h += '<span class="more-h">How to do it</span><ol>' + m.how.map(function(s){ return '<li>' + md(s) + '</li>'; }).join('') + '</ol>';
+  if (m.see) h += '<p class="more-see"><b>You should see:</b> ' + md(m.see) + '</p>';
+  if (m.fix) h += '<p class="more-fix"><b>If it doesn\'t work:</b> ' + md(m.fix) + '</p>';
+  return h + '</div></details>';
 }
 
 /* ================= State ================= */
@@ -1609,11 +1872,13 @@ function renderSession(d){
     var dn = !!state.done[x.id], cur = x === t;
     return '<button type="button" class="wk-chip' + (dn ? ' done' : '') + (cur ? ' cur' : '') + '" data-act="view-task" data-task="' + x.id + '"' + (cur ? ' aria-current="step"' : '') + '>' + (dn ? '✓ ' : (i + 1) + '. ') + esc(x.t) + '</button>';
   }).join('') + '</div>';
+  var allMore = steps.every(function(_, i){ return !!openMore['mo-' + t.id + '-' + i]; });
+  h += '<div class="more-all"><button class="linkbtn" type="button" data-act="more-all" data-task="' + t.id + '">' + (allMore ? 'Close all explanations' : 'Open all explanations') + '</button></div>';
   h += '<ol class="steps">';
   steps.forEach(function(s, i){
     var on = got.indexOf(i) >= 0, id = 'st-' + t.id + '-' + i;
     h += '<li class="step' + (on ? ' done' : '') + '"><input class="ck sk" type="checkbox" id="' + id + '" data-task="' + t.id + '" data-i="' + i + '"' + (on ? ' checked' : '') + '>';
-    h += '<div class="step-main"><div class="step-top"><span class="num">Step ' + (i + 1) + '</span><span class="where w-' + s[0] + '">' + esc(WHERE[s[0]] || '') + '</span></div><label for="' + id + '">' + md(s[1]) + '</label>' + (s[2] ? '<pre>' + esc(s[2]) + '</pre>' : '') + '</div></li>';
+    h += '<div class="step-main"><div class="step-top"><span class="num">Step ' + (i + 1) + '</span><span class="where w-' + s[0] + '">' + esc(WHERE[s[0]] || '') + '</span></div><label for="' + id + '">' + md(s[1]) + '</label>' + (s[2] ? '<pre>' + esc(s[2]) + '</pre>' : '') + moreHtml(t, i) + '</div></li>';
   });
   h += '</ol>';
   if (confirmWeek === m.id) h += confirmRow(m);
@@ -2201,7 +2466,9 @@ function startTimer(mod){ if (mod) timer.topic = mod; if (!timer.topic) timer.to
 function scrollToEl(el){ if (!el) return; var y = el.getBoundingClientRect().top + window.scrollY - ($(".top").offsetHeight + 14); window.scrollTo({top:y, behavior:reduced ? "auto" : "smooth"}); }
 
 document.addEventListener("toggle", function(e){
-  var el = e.target; if (!el.classList || !el.classList.contains("mod")) return;
+  var el = e.target; if (!el.classList) return;
+  if (el.classList.contains("more")){ openMore[el.id] = el.open; var ma = document.querySelector('#focus [data-act="more-all"]'); if (ma){ var all = Array.prototype.every.call(document.querySelectorAll("#focus details.more"), function(x){ return x.open; }); ma.textContent = all ? "Close all explanations" : "Open all explanations"; } return; }
+  if (!el.classList.contains("mod")) return;
   var id = el.getAttribute("data-mod"); if (!openMods) openMods = {};
   openMods[id] = el.open;
 }, true);
@@ -2247,6 +2514,13 @@ document.addEventListener("click", function(e){
     var mod = b.getAttribute("data-mod");
     if (timer.running || timer.acc > 0){ if (timer.topic !== mod) toast("Finish or discard your current session first."); else if (!timer.running) startTimer(); }
     else { ensureStart(); startTimer(mod); toast("Timer started: " + modName(mod)); }
+  }
+  else if (act === "more-all"){
+    var mt = ITEMS[b.getAttribute("data-task")];
+    if (mt){ var nst = stepsFor(mt).length, allO = true, q;
+      for (q = 0; q < nst; q++) if (!openMore["mo-" + mt.id + "-" + q]) allO = false;
+      for (q = 0; q < nst; q++) openMore["mo-" + mt.id + "-" + q] = !allO;
+      renderSession(derive()); }
   }
   else if (act === "go-today"){ viewTask = null; justFinished = null; showTab("today"); window.scrollTo({top:0, behavior:reduced ? "auto" : "smooth"}); }
   else if (act === "start-next"){ justFinished = null; viewTask = null; render(); window.scrollTo({top:0, behavior:reduced ? "auto" : "smooth"}); }
